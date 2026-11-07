@@ -7,6 +7,7 @@ let isAdmin = false;
 let pollTimer = null;
 let editingMatch = false;
 const overSectionOpen = {};
+let lastOverInnings = null;
 const EXTRA_LABELS = {
 	wide: "Wide",
 	"no-ball": "No-ball",
@@ -463,6 +464,7 @@ async function openMatch(id) {
 	editingMatch = false;
 	setPendingExtra("");
 	Object.keys(overSectionOpen).forEach((k) => delete overSectionOpen[k]);
+	lastOverInnings = state ? state.innings : null;
 	$("matchTitle").textContent = matchTitleText(state);
 	show("app");
 	$("matchesView").classList.add("hidden");
@@ -759,6 +761,10 @@ function renderOverCards() {
 		el.innerHTML = "";
 		return;
 	}
+	if (lastOverInnings !== state.innings) {
+		Object.keys(overSectionOpen).forEach((k) => delete overSectionOpen[k]);
+		lastOverInnings = state.innings;
+	}
 	const c = calc();
 	const batting = battingTeamName();
 	const currentScore = c.total + "/" + c.w + " (" + oversText(c.legal) + ")";
@@ -770,9 +776,9 @@ function renderOverCards() {
 		currentScore,
 		current,
 		!isComplete(),
-		false,
+		true,
 	);
-	if (state.innings_1) {
+	if (state.innings === 2 && state.innings_1) {
 		const i1 = state.innings_1;
 		appendOverSection(
 			el,
