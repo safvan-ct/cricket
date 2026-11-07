@@ -57,8 +57,9 @@
 .keypad .boundary:hover{background:#e6b220}
 .keypad .wicket-btn{background:var(--red);color:#fff}
 .keypad .wicket-btn:hover{background:#a82e2e}
-.score-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-.score-actions .ghost{margin-bottom:0}
+.keypad-sep{border:0;border-top:1px solid var(--line);margin:14px 0 0}
+.score-actions{display:flex;flex-direction:row;flex-wrap:nowrap;justify-content:space-between;align-items:center;gap:8px;width:100%;margin-top:14px}
+.score-actions .ghost{margin-bottom:0;width:auto;flex:0 0 auto}
 #recordPanel.scoring-locked .keypad{opacity:.45;pointer-events:none}
 .innings-label-row{margin:18px 0 8px}
 .over-team{background:#fff;border:1px solid var(--line);border-radius:16px;margin-bottom:14px;box-shadow:0 4px 20px #0030870d;overflow:hidden}
