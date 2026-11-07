@@ -966,12 +966,23 @@ document
 	.forEach((b) => (b.onclick = () => openDeliveryPopup(b.dataset.extra)));
 $("undo").onclick = async () => {
 	if (!state) return;
+	let title = "Undo";
 	let msg = "Undo the last delivery?";
-	if (isComplete()) msg = "Reopen the completed match?";
-	else if (state.innings === 2 && !(state.deliveries || []).length)
+	let confirmLabel = "Undo";
+	if (isComplete()) {
+		title = "Reopen match";
+		msg = "Reopen the completed match?";
+		confirmLabel = "Reopen";
+	} else if (state.innings === 2 && !(state.deliveries || []).length)
 		msg = "Undo end of innings?";
 	else if (!(state.deliveries || []).length) return;
-	if (!confirm(msg)) return;
+	const ok = await showModal({
+		title,
+		message: msg,
+		confirmLabel,
+		showCancel: true,
+	});
+	if (!ok) return;
 	try {
 		const r = await api("undo", "POST", {}, current);
 		state = r.state;
