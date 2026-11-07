@@ -2,6 +2,9 @@ const $=id=>document.getElementById(id);let current=null;let state=null;let pend
 const EXTRA_LABELS={wide:'Wide','no-ball':'No-ball',bye:'Bye',overthrow:'Ovr 4',wicket:'Wicket'};
 async function api(action,method='GET',data=null,id=null){const url='api/index.php?action='+action+(id?'&id='+id:'');const r=await fetch(url,{method,headers:data?{'Content-Type':'application/json'}:{},body:data?JSON.stringify(data):undefined});const j=await r.json();if(!r.ok)throw new Error(j.error||'Request failed');return j}
 function show(id){['login','app','setupView','scoreView'].forEach(x=>$(x).classList.add('hidden'));$(id).classList.remove('hidden');if(id==='app'){$('matchesView').classList.remove('hidden');$('setupView').classList.add('hidden');$('scoreView').classList.add('hidden')}}
+function readScoreId(){const m=String(location.hash||'').match(/^#m=(\d+)$/);return m?m[1]:null}
+function rememberMatch(id){const next='#m='+id;if(location.hash!==next)history.replaceState(null,'',location.pathname+location.search+next)}
+function forgetMatch(){if(location.hash)history.replaceState(null,'',location.pathname+location.search)}
 function stopPoll(){if(pollTimer){clearInterval(pollTimer);pollTimer=null}}
 function startViewerPoll(){stopPoll();if(isAdmin||!current)return;pollTimer=setInterval(async()=>{if(!current||isAdmin)return;try{const r=await api('get','GET',null,current);state=r.state;render()}catch(e){}},4000)}
 function scoringOpen(){return !$('scoreView').classList.contains('hidden')||editingMatch}
@@ -15,11 +18,11 @@ function applyRole(){
   $('loginBtn').classList.toggle('hidden',isAdmin);
   $('recordPanel').classList.toggle('hidden',!isAdmin);
 }
-async function boot(){if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}try{const s=await api('status');isAdmin=!!s.authenticated;applyRole();show('app');loadMatches()}catch(e){isAdmin=false;applyRole();show('app');loadMatches()}}
+async function boot(){if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}try{const s=await api('status');isAdmin=!!s.authenticated}catch(e){isAdmin=false}applyRole();const id=readScoreId();if(id){try{await openMatch(id);return}catch(e){forgetMatch()}}show('app');loadMatches()}
 $('loginBtn').onclick=()=>{$('loginError').textContent='';show('login')};
-$('backToMatches').onclick=()=>{show('app');loadMatches()};
-$('loginForm').onsubmit=async e=>{e.preventDefault();try{await api('login','POST',{password:$('password').value});$('password').value='';isAdmin=true;applyRole();show('app');loadMatches()}catch(err){$('loginError').textContent=err.message}};
-$('logout').onclick=async()=>{stopPoll();await api('logout','POST',{});isAdmin=false;current=null;applyRole();show('app');loadMatches()};
+$('backToMatches').onclick=()=>{forgetMatch();show('app');loadMatches()};
+$('loginForm').onsubmit=async e=>{e.preventDefault();try{await api('login','POST',{password:$('password').value});$('password').value='';isAdmin=true;applyRole();forgetMatch();show('app');loadMatches()}catch(err){$('loginError').textContent=err.message}};
+$('logout').onclick=async()=>{stopPoll();await api('logout','POST',{});isAdmin=false;current=null;applyRole();forgetMatch();show('app');loadMatches()};
 function matchStarted(){const balls=(state.deliveries||[]).length+((state.innings_1&&state.innings_1.deliveries)||[]).length+((state.innings_2&&state.innings_2.deliveries)||[]).length;return balls>0}
 function fillSetup(mode){
   editingMatch=mode==='update';
@@ -43,8 +46,8 @@ function fillSetup(mode){
 }
 $('newMatch').onclick=()=>{if(!isAdmin)return;stopPoll();editingMatch=false;fillSetup('create')};
 $('updateMatch').onclick=()=>{if(!isAdmin||!current)return;stopPoll();fillSetup('update')};
-$('cancelSetup').onclick=()=>{if(editingMatch&&current){editingMatch=false;$('setupView').classList.add('hidden');$('scoreView').classList.remove('hidden');headerMode();startViewerPoll();return}editingMatch=false;show('app');headerMode();loadMatches()};
-$('back').onclick=()=>{stopPoll();current=null;editingMatch=false;setPendingExtra('');show('app');headerMode();loadMatches()};
+$('cancelSetup').onclick=()=>{if(editingMatch&&current){editingMatch=false;$('setupView').classList.add('hidden');$('scoreView').classList.remove('hidden');headerMode();startViewerPoll();return}editingMatch=false;forgetMatch();show('app');headerMode();loadMatches()};
+$('back').onclick=()=>{stopPoll();current=null;editingMatch=false;setPendingExtra('');forgetMatch();show('app');headerMode();loadMatches()};
 function syncTossPills(){const a=($('teamA').value.trim()||'Team A').toUpperCase();const b=($('teamB').value.trim()||'Team B').toUpperCase();$('pillA').textContent=a;$('pillB').textContent=b;}
 $('teamA').addEventListener('input',syncTossPills);$('teamB').addEventListener('input',syncTossPills);
 
@@ -85,7 +88,7 @@ keys.forEach((key,i)=>{
   details.append(body);$('matchList').append(details);
 });}catch(e){alert(e.message)}}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-async function openMatch(id){const r=await api('get','GET',null,id);current=id;state=r.state;editingMatch=false;setPendingExtra('');Object.keys(overSectionOpen).forEach(k=>delete overSectionOpen[k]);$('matchTitle').textContent=r.title;show('app');$('matchesView').classList.add('hidden');$('setupView').classList.add('hidden');$('scoreView').classList.remove('hidden');headerMode();fillPlayers();render();startViewerPoll()}
+async function openMatch(id){const r=await api('get','GET',null,id);current=id;state=r.state;editingMatch=false;setPendingExtra('');Object.keys(overSectionOpen).forEach(k=>delete overSectionOpen[k]);$('matchTitle').textContent=r.title;show('app');$('matchesView').classList.add('hidden');$('setupView').classList.add('hidden');$('scoreView').classList.remove('hidden');headerMode();fillPlayers();render();startViewerPoll();rememberMatch(id)}
 function fillPlayers(){const countA=state.players_a||state.players;const countB=state.players_b||state.players;['batter','bowler'].forEach(id=>{const el=$(id);if(!el||el.tagName!=='SELECT')return;el.innerHTML='';const count=(id==='bowler')?(state.batting_first==='A'?countB:countA):(state.batting_first==='A'?countA:countB);for(let i=1;i<=count;i++){const o=document.createElement('option');o.value=i;o.textContent='Player '+i;el.append(o)}})}
 function battingSide(){const first=state.batting_first==='B'?'B':'A';return state.innings===2?(first==='A'?'B':'A'):first}
 function battingTeamName(){return battingSide()==='B'?state.team_b:state.team_a}
@@ -253,7 +256,7 @@ function showModal({title,message,confirmLabel='OK',showCancel=false,fields=fals
 async function notifyPhaseChange(){
   if(isComplete()&&state.result&&state.result.text){
     await showModal({title:'Match complete',message:state.result.text,confirmLabel:'OK',showCancel:false});
-    stopPoll();current=null;setPendingExtra('');show('app');loadMatches();
+    stopPoll();current=null;setPendingExtra('');forgetMatch();show('app');loadMatches();
     return;
   }
   if(state.innings===2&&!(state.deliveries||[]).length)return showModal({title:'End innings',message:'2nd innings. Target '+state.target+'.',confirmLabel:'Start 2nd innings',showCancel:false});
