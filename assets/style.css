@@ -80,8 +80,10 @@
 .over-card-balls{display:flex;gap:6px;flex-wrap:wrap}
 .modal{position:fixed;inset:0;background:#001433bf;display:flex;align-items:center;justify-content:center;padding:20px;z-index:200}
 .modal.hidden{display:none!important}
-.modal-card{background:#fff;border-radius:16px;border-top:4px solid var(--gold);padding:22px 22px 18px;max-width:400px;width:100%;box-shadow:0 16px 48px #00000050}
-.modal-card h2{margin:0 0 10px;font-size:20px;color:var(--blue)}
+.modal-card{position:relative;background:#fff;border-radius:16px;border-top:4px solid var(--gold);padding:22px 22px 18px;max-width:400px;width:100%;box-shadow:0 16px 48px #00000050}
+.modal-close{position:absolute;top:10px;right:10px;width:32px;height:32px;padding:0;border-radius:8px;background:transparent;color:#3a5a7a;font-size:22px;line-height:1}
+.modal-close:hover{background:#eef4fb}
+.modal-card h2{margin:0 36px 10px 0;font-size:20px;color:var(--blue)}
 .modal-card p{margin:0 0 8px;color:var(--muted);font-size:14px;line-height:1.45}
 .modal-actions{display:flex;justify-content:center;gap:8px}
 .modal-fields{display:flex;flex-direction:column;gap:12px;margin:0 0 18px}

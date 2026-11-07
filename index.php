@@ -155,6 +155,7 @@
   </main>
   <div id="modal" class="modal hidden" aria-hidden="true">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button type="button" id="modalClose" class="modal-close" aria-label="Close">×</button>
       <h2 id="modalTitle">Confirm</h2>
       <p id="modalMessage"></p>
       <div id="modalFields" class="modal-fields hidden">
@@ -171,7 +172,6 @@
         <label id="modalWicketRow" class="modal-check"><input id="modalWicket" type="checkbox"> Wicket</label>
       </div>
       <div class="modal-actions">
-        <button id="modalCancel" class="ghost">Cancel</button>
         <button id="modalOk" class="primary">OK</button>
       </div>
     </div>

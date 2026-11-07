@@ -817,7 +817,7 @@ function showModal({
 	$("modalTitle").textContent = title;
 	$("modalMessage").textContent = message;
 	$("modalOk").textContent = confirmLabel;
-	$("modalCancel").classList.toggle("hidden", !showCancel);
+	$("modalClose").classList.toggle("hidden", !showCancel);
 	$("modalFields").classList.toggle("hidden", !fields);
 	if (fields) {
 		const ovr = $("modalFields").classList.contains("overthrow-mode");
@@ -1021,7 +1021,7 @@ $("endMatch").onclick = async () => {
 	}
 };
 $("modalOk").onclick = () => closeModal(true);
-$("modalCancel").onclick = () => closeModal(false);
+$("modalClose").onclick = () => closeModal(false);
 $("modal").onclick = (e) => {
 	if (e.target === $("modal") && $("modal").dataset.allowDismiss === "1")
 		closeModal(false);
