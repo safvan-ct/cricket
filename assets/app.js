@@ -74,8 +74,10 @@ function scoringOpen() {
 	return !$("scoreView").classList.contains("hidden") || editingMatch;
 }
 function headerMode() {
-	$("newMatch").classList.toggle("hidden", !isAdmin || scoringOpen());
-	$("updateMatch").classList.toggle("hidden", !isAdmin || !scoringOpen());
+	const inProgress =
+		isAdmin && scoringOpen() && state && state.status !== "complete";
+	$("newMatch").classList.toggle("hidden", !isAdmin || inProgress);
+	$("updateMatch").classList.toggle("hidden", !inProgress);
 }
 function applyRole() {
 	headerMode();
@@ -202,7 +204,7 @@ $("newMatch").onclick = () => {
 	fillSetup("create");
 };
 $("updateMatch").onclick = () => {
-	if (!isAdmin || !current) return;
+	if (!isAdmin || !current || !state || state.status === "complete") return;
 	stopPoll();
 	fillSetup("update");
 };
@@ -338,20 +340,54 @@ function makeMatchCard(m) {
 	open.textContent = "Open";
 	open.onclick = () => openMatch(m.id);
 	actions.append(open);
-	if (isAdmin) {
+	if (isAdmin && !s.locked && s.result && s.result.text) {
+		const mark = document.createElement("button");
+		mark.className = "ghost mark-complete";
+		mark.textContent = "Mark completed";
+		mark.onclick = () => markMatchFromCard(m);
+		actions.append(mark);
+	}
+	if (isAdmin && !s.locked) {
 		const del = document.createElement("button");
 		del.className = "ghost";
 		del.textContent = "Delete";
 		del.onclick = async () => {
-			if (confirm("Delete this match?")) {
+			const ok = await showModal({
+				title: "Delete",
+				message: "Delete this match?",
+				confirmLabel: "Delete",
+				showCancel: true,
+			});
+			if (!ok) return;
+			try {
 				await api("delete", "POST", {}, m.id);
 				loadMatches();
+			} catch (e) {
+				alert(e.message);
 			}
 		};
 		actions.append(del);
 	}
 	d.append(info, actions);
 	return d;
+}
+async function markMatchFromCard(m) {
+	const wasLive = (m.state.status || "") !== "complete";
+	const ok = await showModal({
+		title: "Mark completed",
+		message: "Mark this match completed? It cannot be deleted or reopened.",
+		confirmLabel: "Mark completed",
+		showCancel: true,
+	});
+	if (!ok) return;
+	try {
+		const r = await api("mark_complete", "POST", {}, m.id);
+		if (!wasLive) return loadMatches();
+		state = r.state;
+		await notifyPhaseChange();
+	} catch (e) {
+		alert(e.message);
+	}
 }
 async function loadMatches() {
 	try {
@@ -768,6 +804,7 @@ function setPendingExtra(type) {
 	syncPendingButtons();
 }
 function render() {
+	headerMode();
 	$("matchTitle").textContent = matchTitleText(state);
 	const c = calc();
 	const team = battingTeamName();
@@ -806,6 +843,7 @@ function render() {
 		"hidden",
 		!(isAdmin && live && state.innings === 2),
 	);
+	$("undo").classList.toggle("hidden", !!state.locked);
 	$("recordPanel").classList.toggle("hidden", !isAdmin);
 	$("recordPanel").classList.toggle("scoring-locked", isComplete());
 	if (isComplete()) {
@@ -813,7 +851,8 @@ function render() {
 			state.result && state.result.text ? state.result.text : "Match complete.";
 	}
 	const overs = groupOvers(state.deliveries || []);
-	const stickyOver = overs.length ? overs[overs.length - 1].balls : [];
+	const lastOver = overs.length ? overs[overs.length - 1] : null;
+	const stickyOver = lastOver && !lastOver.complete ? lastOver.balls : [];
 	const overRunCount = overRuns(stickyOver);
 	$("thisOverRuns").textContent =
 		overRunCount === 1 ? "1 run" : overRunCount + " runs";

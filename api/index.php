@@ -139,6 +139,20 @@ function completeMatch(array &$s): void
   $s['result'] = resultFor($s, $s['innings_2']);
   $s['status'] = 'complete';
 }
+function markCompleted(array &$s): void
+{
+  if (!empty($s['locked'])) return;
+  if (($s['status'] ?? '') !== 'complete') {
+    if ((int)($s['innings'] ?? 1) === 2) completeMatch($s);
+    else {
+      $stats = inningsStats($s['deliveries'] ?? []);
+      $s['innings_1'] = snapshotInnings($s, $stats);
+      $s['status'] = 'complete';
+      $s['result'] = ['winner' => '', 'text' => 'Match complete'];
+    }
+  }
+  $s['locked'] = true;
+}
 function inningsShouldClose(array $s): bool
 {
   $stats = inningsStats($s['deliveries'] ?? []);
@@ -184,6 +198,10 @@ if ($action === 'update') {
   $b = body();
   $pdo->beginTransaction();
   $s = loadMatchForUpdate($pdo, $id);
+  if (($s['status'] ?? '') === 'complete') {
+    $pdo->rollBack();
+    respond(['error' => 'Match is complete'], 422);
+  }
   $a = trim((string)($b['team_a'] ?? ''));
   $c = trim((string)($b['team_b'] ?? ''));
   if ($a === '' || $c === '') {
@@ -297,10 +315,27 @@ if ($action === 'end_match') {
   $pdo->commit();
   respond(['ok' => true, 'state' => $s]);
 }
+if ($action === 'mark_complete') {
+  requireAdmin();
+  $pdo->beginTransaction();
+  $s = loadMatchForUpdate($pdo, $id);
+  if (!empty($s['locked'])) {
+    $pdo->rollBack();
+    respond(['error' => 'Match is marked completed'], 422);
+  }
+  markCompleted($s);
+  saveMatch($pdo, $id, $s);
+  $pdo->commit();
+  respond(['ok' => true, 'state' => $s]);
+}
 if ($action === 'undo') {
   requireAdmin();
   $pdo->beginTransaction();
   $s = loadMatchForUpdate($pdo, $id);
+  if (!empty($s['locked'])) {
+    $pdo->rollBack();
+    respond(['error' => 'Match is marked completed'], 422);
+  }
   if (($s['status'] ?? '') === 'complete') {
     $s['status'] = 'live';
     unset($s['result'], $s['innings_2']);
@@ -322,8 +357,15 @@ if ($action === 'undo') {
 }
 if ($action === 'delete') {
   requireAdmin();
+  $pdo->beginTransaction();
+  $s = loadMatchForUpdate($pdo, $id);
+  if (!empty($s['locked'])) {
+    $pdo->rollBack();
+    respond(['error' => 'Match is marked completed'], 422);
+  }
   $st = $pdo->prepare('DELETE FROM matches WHERE id=?');
   $st->execute([$id]);
+  $pdo->commit();
   respond(['ok' => true]);
 }
 respond(['error' => 'Unknown action'], 404);
