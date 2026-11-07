@@ -856,9 +856,11 @@ async function notifyPhaseChange() {
 		});
 		stopPoll();
 		current = null;
+		editingMatch = false;
 		setPendingExtra("");
 		forgetMatch();
 		show("app");
+		headerMode();
 		loadMatches();
 		return;
 	}

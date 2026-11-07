@@ -10,7 +10,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#002868">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Scoreboard">
+  <meta name="apple-mobile-web-app-title" content="Cricket">
   <link rel="stylesheet" href="assets/style.css?v=<?php echo filemtime(__DIR__ . '/assets/style.css') ?>">
 </head>
 
@@ -106,7 +106,8 @@
 
       <div id="scoreView" class="hidden">
         <div class="section-head"><button id="back" class="ghost">← Matches</button>
-        <span id="matchTitle" class="eyebrow"></span></div>
+          <span id="matchTitle" class="eyebrow"></span>
+        </div>
         <div class="score-hero">
           <div class="sb-line1">
             <span id="sbTeam" class="sb-team-name"></span>
@@ -153,6 +154,7 @@
       </div>
     </section>
   </main>
+
   <div id="modal" class="modal hidden" aria-hidden="true">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <button type="button" id="modalClose" class="modal-close" aria-label="Close">×</button>
@@ -176,6 +178,7 @@
       </div>
     </div>
   </div>
+
   <script src="assets/app.js?v=<?php echo filemtime(__DIR__ . '/assets/app.js') ?>"></script>
 </body>
 
