@@ -73,9 +73,54 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
         <button id="updateMatch" class="primary hidden">Update match info</button>
       </div>
 
+      <div class="main-tabs" id="mainTabs">
+        <button type="button" id="tabMatches" class="main-tab-btn active">🏏 Matches</button>
+        <button type="button" id="tabStats" class="main-tab-btn">📊 Player Stats</button>
+      </div>
+
       <div id="matchesView" class="panel">
         <h2>Saved matches</h2>
         <div id="matchList" class="match-list"></div>
+      </div>
+
+      <div id="statsView" class="panel hidden">
+        <div class="stats-header">
+          <div class="stats-title-group">
+            <h2>Player Statistics</h2>
+            <p class="hint" style="margin:2px 0 0">Career statistics aggregated across completed matches</p>
+          </div>
+          <button type="button" id="addPlayerBtn" class="primary narrow hidden">＋ Add player</button>
+        </div>
+
+        <div class="leaderboard-grid" id="leaderboardGrid"></div>
+
+        <div class="player-directory-section">
+          <div class="player-directory-head">
+            <h3>Player Directory</h3>
+            <div class="search-filter-box">
+              <input type="text" id="playerDirSearch" placeholder="Search players..." class="stats-search-input">
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="player-stats-table" id="playerStatsTable">
+              <thead>
+                <tr>
+                  <th class="sc-col-player">Player</th>
+                  <th>Mat</th>
+                  <th>Runs</th>
+                  <th>HS</th>
+                  <th>Avg</th>
+                  <th>SR</th>
+                  <th>Wkts</th>
+                  <th>BBI</th>
+                  <th>Econ</th>
+                </tr>
+              </thead>
+              <tbody id="playerStatsBody"></tbody>
+            </table>
+          </div>
+          <div id="playerStatsPagination" class="pagination-bar"></div>
+        </div>
       </div>
 
       <div id="setupView" class="panel hidden">
@@ -89,8 +134,19 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
             <label>Team A name<input id="teamA" required value="PAREL"></label>
             <label>Number of players<input id="playersA" type="number" min="2" max="15" value="7" required></label>
             <div id="rosterAWrap" class="roster-wrap">
-              <span class="subhead roster-title">Team A Players</span>
-              <div id="rosterAGrid" class="roster-grid"></div>
+              <div class="roster-header-row">
+                <span class="subhead roster-title">Team A Players (<span id="countA">0</span>/<span id="maxA">7</span>)</span>
+                <button type="button" id="autoFillA" class="ghost-btn-sm">Auto-fill</button>
+              </div>
+              <div id="selectedChipsA" class="selected-chips"></div>
+              <div class="chip-input-row">
+                <input type="text" id="playerSearchA" class="chip-search-input" placeholder="Search or add player...">
+                <button type="button" id="addChipA" class="chip-add-btn">Add</button>
+              </div>
+              <div class="pool-wrap">
+                <span class="pool-hint">Tap from common pool:</span>
+                <div id="poolChipsA" class="pool-chips"></div>
+              </div>
             </div>
           </div>
 
@@ -98,8 +154,19 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
             <label>Team B name<input id="teamB" required value="BNA"></label>
             <label>Number of players<input id="playersB" type="number" min="2" max="15" value="7" required></label>
             <div id="rosterBWrap" class="roster-wrap">
-              <span class="subhead roster-title">Team B Players</span>
-              <div id="rosterBGrid" class="roster-grid"></div>
+              <div class="roster-header-row">
+                <span class="subhead roster-title">Team B Players (<span id="countB">0</span>/<span id="maxB">7</span>)</span>
+                <button type="button" id="autoFillB" class="ghost-btn-sm">Auto-fill</button>
+              </div>
+              <div id="selectedChipsB" class="selected-chips"></div>
+              <div class="chip-input-row">
+                <input type="text" id="playerSearchB" class="chip-search-input" placeholder="Search or add player...">
+                <button type="button" id="addChipB" class="chip-add-btn">Add</button>
+              </div>
+              <div class="pool-wrap">
+                <span class="pool-hint">Tap from common pool:</span>
+                <div id="poolChipsB" class="pool-chips"></div>
+              </div>
             </div>
           </div>
 

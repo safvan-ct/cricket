@@ -32,9 +32,17 @@ function show(id) {
 	);
 	$(id).classList.remove("hidden");
 	if (id === "app") {
-		$("matchesView").classList.remove("hidden");
 		$("setupView").classList.add("hidden");
 		$("scoreView").classList.add("hidden");
+		const mainTabs = $("mainTabs");
+		if (mainTabs) mainTabs.classList.remove("hidden");
+		if (mainTab === "stats") {
+			$("matchesView").classList.add("hidden");
+			$("statsView").classList.remove("hidden");
+		} else {
+			$("matchesView").classList.remove("hidden");
+			$("statsView").classList.add("hidden");
+		}
 	}
 }
 function readScoreId() {
@@ -102,12 +110,20 @@ function headerMode() {
 		isAdmin && scoringOpen() && state && state.status !== "complete";
 	$("newMatch").classList.toggle("hidden", !isAdmin || inProgress);
 	$("updateMatch").classList.toggle("hidden", !inProgress);
+	const matchOpen = !$("scoreView").classList.contains("hidden");
+	const setupOpen = !$("setupView").classList.contains("hidden");
+	const mainTabs = $("mainTabs");
+	if (mainTabs) {
+		mainTabs.classList.toggle("hidden", matchOpen || setupOpen);
+	}
 }
 function applyRole() {
 	headerMode();
 	$("logout").classList.toggle("hidden", !isAdmin);
 	$("loginBtn").classList.toggle("hidden", isAdmin);
 	$("recordPanel").classList.toggle("hidden", !isAdmin);
+	const addPBtn = $("addPlayerBtn");
+	if (addPBtn) addPBtn.classList.toggle("hidden", !isAdmin);
 }
 async function boot() {
 	if ("serviceWorker" in navigator) {
@@ -123,6 +139,7 @@ async function boot() {
 		isAdmin = false;
 	}
 	applyRole();
+	await loadCommonPlayers();
 	const id = readScoreId();
 	if (id) {
 		try {
@@ -197,25 +214,279 @@ function matchStarted() {
 		((state.innings_2 && state.innings_2.deliveries) || []).length;
 	return balls > 0;
 }
-function renderRosterInputs(side, count, existing = []) {
-	const container = $(side === "A" ? "rosterAGrid" : "rosterBGrid");
-	if (!container) return;
-	const currentInputs = Array.from(container.querySelectorAll("input")).map(
-		(inp) => inp.value,
-	);
-	container.innerHTML = "";
-	for (let i = 1; i <= count; i++) {
-		const idx = i - 1;
-		const input = document.createElement("input");
-		input.type = "text";
-		input.placeholder = "Player " + i;
-		input.value =
-			(currentInputs && currentInputs[idx]) ||
-			(existing && existing[idx]) ||
-			"Player " + i;
-		container.append(input);
+let commonPlayers = [];
+let selectedRosterA = [];
+let selectedRosterB = [];
+let poolSearchA = "";
+let poolSearchB = "";
+let mainTab = "matches";
+let playerStatsData = null;
+let playerStatsFilter = "";
+
+async function loadCommonPlayers() {
+	try {
+		const r = await api("players");
+		commonPlayers = (r.players || []).map((p) => p.name);
+	} catch (e) {
+		commonPlayers = [];
 	}
 }
+
+function renderRosterChips() {
+	const maxA = Math.max(2, Math.min(15, parseInt($("playersA").value, 10) || 7));
+	const maxB = Math.max(2, Math.min(15, parseInt($("playersB").value, 10) || 7));
+
+	if ($("countA")) $("countA").textContent = selectedRosterA.length;
+	if ($("maxA")) $("maxA").textContent = maxA;
+	if ($("countB")) $("countB").textContent = selectedRosterB.length;
+	if ($("maxB")) $("maxB").textContent = maxB;
+
+	// Render Selected A
+	const selA = $("selectedChipsA");
+	if (selA) {
+		selA.innerHTML = "";
+		if (!selectedRosterA.length) {
+			selA.innerHTML = '<span class="hint" style="margin:2px 4px;font-size:11px">No players selected. Tap from pool below or type name.</span>';
+		} else {
+			selectedRosterA.forEach((name, idx) => {
+				const chip = document.createElement("span");
+				chip.className = "sel-chip";
+				const num = document.createElement("span");
+				num.className = "sel-chip-num";
+				num.textContent = idx + 1;
+				const txt = document.createElement("span");
+				txt.className = "sel-chip-name";
+				txt.textContent = name;
+				const btn = document.createElement("button");
+				btn.type = "button";
+				btn.className = "sel-chip-remove";
+				btn.innerHTML = "&times;";
+				btn.title = "Remove from Team A";
+				btn.onclick = () => {
+					selectedRosterA.splice(idx, 1);
+					renderRosterChips();
+				};
+				chip.append(num, txt, btn);
+				selA.append(chip);
+			});
+		}
+	}
+
+	// Render Pool A
+	const poolA = $("poolChipsA");
+	if (poolA) {
+		poolA.innerHTML = "";
+		const qA = poolSearchA.trim().toLowerCase();
+		const listA = commonPlayers.filter((p) => !qA || p.toLowerCase().includes(qA));
+		if (!listA.length) {
+			const hint = document.createElement("span");
+			hint.className = "hint";
+			hint.style.fontSize = "11px";
+			hint.textContent = "No matching players in directory.";
+			poolA.append(hint);
+		} else {
+			listA.forEach((name) => {
+				const chip = document.createElement("span");
+				chip.className = "pool-chip";
+				chip.textContent = name;
+				const inA = selectedRosterA.includes(name);
+				const inB = selectedRosterB.includes(name);
+				if (inA) {
+					chip.classList.add("selected");
+					chip.title = "Selected in Team A (tap to remove)";
+					chip.onclick = () => {
+						selectedRosterA = selectedRosterA.filter((p) => p !== name);
+						renderRosterChips();
+					};
+				} else if (inB) {
+					chip.classList.add("disabled");
+					chip.title = "Already selected in Team B";
+					chip.textContent = name + " (Team B)";
+				} else {
+					chip.onclick = () => {
+						if (selectedRosterA.length >= maxA) {
+							showError(`Team A is full (${maxA} players). Increase player count to add more.`);
+							return;
+						}
+						selectedRosterA.push(name);
+						renderRosterChips();
+					};
+				}
+				poolA.append(chip);
+			});
+		}
+		if (isAdmin) {
+			const addChip = document.createElement("span");
+			addChip.className = "pool-chip add-new-pill";
+			addChip.textContent = "＋ New Player";
+			addChip.title = "Register a new player in directory";
+			addChip.onclick = async () => {
+				const newName = await showAddPlayerModal(poolSearchA.trim());
+				if (newName && selectedRosterA.length < maxA && !selectedRosterA.includes(newName)) {
+					selectedRosterA.push(newName);
+					renderRosterChips();
+				}
+			};
+			poolA.append(addChip);
+		}
+	}
+
+	// Render Selected B
+	const selB = $("selectedChipsB");
+	if (selB) {
+		selB.innerHTML = "";
+		if (!selectedRosterB.length) {
+			selB.innerHTML = '<span class="hint" style="margin:2px 4px;font-size:11px">No players selected. Tap from pool below or type name.</span>';
+		} else {
+			selectedRosterB.forEach((name, idx) => {
+				const chip = document.createElement("span");
+				chip.className = "sel-chip";
+				const num = document.createElement("span");
+				num.className = "sel-chip-num";
+				num.textContent = idx + 1;
+				const txt = document.createElement("span");
+				txt.className = "sel-chip-name";
+				txt.textContent = name;
+				const btn = document.createElement("button");
+				btn.type = "button";
+				btn.className = "sel-chip-remove";
+				btn.innerHTML = "&times;";
+				btn.title = "Remove from Team B";
+				btn.onclick = () => {
+					selectedRosterB.splice(idx, 1);
+					renderRosterChips();
+				};
+				chip.append(num, txt, btn);
+				selB.append(chip);
+			});
+		}
+	}
+
+	// Render Pool B
+	const poolB = $("poolChipsB");
+	if (poolB) {
+		poolB.innerHTML = "";
+		const qB = poolSearchB.trim().toLowerCase();
+		const listB = commonPlayers.filter((p) => !qB || p.toLowerCase().includes(qB));
+		if (!listB.length) {
+			const hint = document.createElement("span");
+			hint.className = "hint";
+			hint.style.fontSize = "11px";
+			hint.textContent = "No matching players in directory.";
+			poolB.append(hint);
+		} else {
+			listB.forEach((name) => {
+				const chip = document.createElement("span");
+				chip.className = "pool-chip";
+				chip.textContent = name;
+				const inA = selectedRosterA.includes(name);
+				const inB = selectedRosterB.includes(name);
+				if (inB) {
+					chip.classList.add("selected");
+					chip.title = "Selected in Team B (tap to remove)";
+					chip.onclick = () => {
+						selectedRosterB = selectedRosterB.filter((p) => p !== name);
+						renderRosterChips();
+					};
+				} else if (inA) {
+					chip.classList.add("disabled");
+					chip.title = "Already selected in Team A";
+					chip.textContent = name + " (Team A)";
+				} else {
+					chip.onclick = () => {
+						if (selectedRosterB.length >= maxB) {
+							showError(`Team B is full (${maxB} players). Increase player count to add more.`);
+							return;
+						}
+						selectedRosterB.push(name);
+						renderRosterChips();
+					};
+				}
+				poolB.append(chip);
+			});
+		}
+		if (isAdmin) {
+			const addChip = document.createElement("span");
+			addChip.className = "pool-chip add-new-pill";
+			addChip.textContent = "＋ New Player";
+			addChip.title = "Register a new player in directory";
+			addChip.onclick = async () => {
+				const newName = await showAddPlayerModal(poolSearchB.trim());
+				if (newName && selectedRosterB.length < maxB && !selectedRosterB.includes(newName)) {
+					selectedRosterB.push(newName);
+					renderRosterChips();
+				}
+			};
+			poolB.append(addChip);
+		}
+	}
+}
+
+async function handleAddChipInput(side) {
+	const inp = $(side === "A" ? "playerSearchA" : "playerSearchB");
+	if (!inp) return;
+	const name = inp.value.trim();
+	if (!name) return;
+	const max = Math.max(2, Math.min(15, parseInt($(side === "A" ? "playersA" : "playersB").value, 10) || 7));
+	const current = side === "A" ? selectedRosterA : selectedRosterB;
+	const other = side === "A" ? selectedRosterB : selectedRosterA;
+
+	const existingMatch = commonPlayers.find((p) => p.toLowerCase() === name.toLowerCase());
+	const finalName = existingMatch || name;
+
+	if (current.some((p) => p.toLowerCase() === finalName.toLowerCase())) {
+		showError(`${finalName} is already in Team ${side}.`);
+		return;
+	}
+	if (other.some((p) => p.toLowerCase() === finalName.toLowerCase())) {
+		showError(`${finalName} is already selected in the opposing team.`);
+		return;
+	}
+	if (current.length >= max) {
+		showError(`Team ${side} is full (${max} players). Increase count to add more.`);
+		return;
+	}
+
+	current.push(finalName);
+	inp.value = "";
+	if (side === "A") poolSearchA = "";
+	else poolSearchB = "";
+
+	if (!existingMatch) {
+		commonPlayers.push(finalName);
+		commonPlayers.sort((a, b) => a.localeCompare(b));
+		try {
+			await api("player_create", "POST", { name: finalName });
+		} catch (e) {}
+	}
+
+	renderRosterChips();
+}
+
+function autoFillRoster(side) {
+	const max = Math.max(2, Math.min(15, parseInt($(side === "A" ? "playersA" : "playersB").value, 10) || 7));
+	const current = side === "A" ? selectedRosterA : selectedRosterB;
+	const other = side === "A" ? selectedRosterB : selectedRosterA;
+
+	for (const p of commonPlayers) {
+		if (current.length >= max) break;
+		if (!current.includes(p) && !other.includes(p)) {
+			current.push(p);
+		}
+	}
+
+	let n = 1;
+	while (current.length < max) {
+		const candidate = "Player " + n;
+		if (!current.includes(candidate) && !other.includes(candidate)) {
+			current.push(candidate);
+		}
+		n++;
+	}
+
+	renderRosterChips();
+}
+
 function fillSetup(mode) {
 	editingMatch = mode === "update";
 	$("setupTitle").textContent = editingMatch
@@ -229,6 +500,10 @@ function fillSetup(mode) {
 		$("playersB").value = 7;
 		$("overs").value = 6;
 		$("battingA").checked = true;
+		selectedRosterA = [];
+		selectedRosterB = [];
+		autoFillRoster("A");
+		autoFillRoster("B");
 	}
 	if (editingMatch && state) {
 		$("teamA").value = state.team_a || "";
@@ -240,6 +515,8 @@ function fillSetup(mode) {
 		document.querySelector(
 			'input[name="batting"][value="' + first + '"]',
 		).checked = true;
+		selectedRosterA = [...(state.roster_a || [])];
+		selectedRosterB = [...(state.roster_b || [])];
 	}
 	const lock = editingMatch && matchStarted();
 	document.querySelectorAll('input[name="batting"]').forEach((el) => {
@@ -247,41 +524,35 @@ function fillSetup(mode) {
 	});
 	$("tossNote").classList.toggle("hidden", !lock);
 	syncTossPills();
-	const countA = Math.max(2, Math.min(15, parseInt($("playersA").value, 10) || 7));
-	const countB = Math.max(2, Math.min(15, parseInt($("playersB").value, 10) || 7));
-	renderRosterInputs(
-		"A",
-		countA,
-		editingMatch && state ? state.roster_a : [],
-	);
-	renderRosterInputs(
-		"B",
-		countB,
-		editingMatch && state ? state.roster_b : [],
-	);
+	poolSearchA = "";
+	poolSearchB = "";
+	if ($("playerSearchA")) $("playerSearchA").value = "";
+	if ($("playerSearchB")) $("playerSearchB").value = "";
+	renderRosterChips();
 	$("matchesView").classList.add("hidden");
+	$("statsView").classList.add("hidden");
 	$("scoreView").classList.add("hidden");
 	$("setupView").classList.remove("hidden");
 	$("app").classList.remove("hidden");
 	headerMode();
 }
 $("playersA").addEventListener("input", () => {
-	const count = Math.max(2, Math.min(15, parseInt($("playersA").value, 10) || 7));
-	renderRosterInputs("A", count);
+	renderRosterChips();
 });
 $("playersB").addEventListener("input", () => {
-	const count = Math.max(2, Math.min(15, parseInt($("playersB").value, 10) || 7));
-	renderRosterInputs("B", count);
+	renderRosterChips();
 });
-$("newMatch").onclick = () => {
+$("newMatch").onclick = async () => {
 	if (!isAdmin) return;
 	stopPoll();
 	editingMatch = false;
+	await loadCommonPlayers();
 	fillSetup("create");
 };
-$("updateMatch").onclick = () => {
+$("updateMatch").onclick = async () => {
 	if (!isAdmin || !current || !state || state.status === "complete") return;
 	stopPoll();
+	await loadCommonPlayers();
 	fillSetup("update");
 };
 $("cancelSetup").onclick = () => {
@@ -324,19 +595,26 @@ $("setupForm").onsubmit = async (e) => {
 		const batting = document.querySelector(
 			'input[name="batting"]:checked',
 		).value;
-		const rosterA = Array.from(
-			$("rosterAGrid").querySelectorAll("input"),
-		).map((inp, idx) => inp.value.trim() || "Player " + (idx + 1));
-		const rosterB = Array.from(
-			$("rosterBGrid").querySelectorAll("input"),
-		).map((inp, idx) => inp.value.trim() || "Player " + (idx + 1));
+		const maxA = Math.max(2, Math.min(15, parseInt($("playersA").value, 10) || 7));
+		const maxB = Math.max(2, Math.min(15, parseInt($("playersB").value, 10) || 7));
+
+		while (selectedRosterA.length < maxA) {
+			autoFillRoster("A");
+		}
+		while (selectedRosterB.length < maxB) {
+			autoFillRoster("B");
+		}
+
+		const finalRosterA = selectedRosterA.slice(0, maxA);
+		const finalRosterB = selectedRosterB.slice(0, maxB);
+
 		const body = {
-			team_a: $("teamA").value,
-			team_b: $("teamB").value,
-			players_a: $("playersA").value,
-			players_b: $("playersB").value,
-			roster_a: rosterA,
-			roster_b: rosterB,
+			team_a: $("teamA").value.trim(),
+			team_b: $("teamB").value.trim(),
+			players_a: maxA,
+			players_b: maxB,
+			roster_a: finalRosterA,
+			roster_b: finalRosterB,
 			overs: $("overs").value,
 			batting_first: batting,
 		};
@@ -355,6 +633,7 @@ $("setupForm").onsubmit = async (e) => {
 			const r = await api("create", "POST", body);
 			await openMatch(r.id);
 		}
+		await loadCommonPlayers();
 	} catch (err) {
 		showError(err.message);
 	}
@@ -532,6 +811,590 @@ async function loadMatches() {
 		});
 	} catch (e) {
 		showError(e.message);
+	}
+}
+function setMainTab(tab) {
+	mainTab = tab;
+	const tabM = $("tabMatches");
+	const tabS = $("tabStats");
+	if (tabM && tabS) {
+		tabM.classList.toggle("active", tab === "matches");
+		tabS.classList.toggle("active", tab === "stats");
+	}
+	$("matchesView").classList.toggle("hidden", tab !== "matches");
+	$("statsView").classList.toggle("hidden", tab !== "stats");
+	if (tab === "stats") {
+		loadPlayerStats();
+	} else {
+		loadMatches();
+	}
+}
+
+async function loadPlayerStats() {
+	try {
+		const r = await api("player_stats");
+		playerStatsData = r.stats || [];
+		renderLeaderboards(r.leaderboards || {});
+		renderPlayerDirectory(playerStatsData, playerStatsFilter);
+	} catch (e) {
+		showError("Failed to load player stats: " + e.message);
+	}
+}
+
+function renderLeaderboards(lb) {
+	const container = $("leaderboardGrid");
+	if (!container) return;
+	container.innerHTML = "";
+
+	function makeCard(title, list, valFn) {
+		const card = document.createElement("div");
+		card.className = "lb-card";
+		const head = document.createElement("div");
+		head.className = "lb-card-head";
+		const t = document.createElement("h4");
+		t.className = "lb-card-title";
+		t.textContent = title;
+		head.append(t);
+		card.append(head);
+
+		const body = document.createElement("div");
+		body.className = "lb-list";
+		if (!list || !list.length) {
+			body.innerHTML = '<span class="hint" style="font-size:11px">No data yet.</span>';
+		} else {
+			list.slice(0, 5).forEach((p, idx) => {
+				const row = document.createElement("div");
+				row.className = "lb-row";
+				row.onclick = () => showPlayerCareerModal(p.name);
+				const left = document.createElement("div");
+				left.className = "lb-left";
+				const rank = document.createElement("span");
+				rank.className = "lb-rank rank-" + (idx + 1);
+				rank.textContent = idx + 1;
+				const name = document.createElement("span");
+				name.className = "lb-name";
+				name.textContent = p.name;
+				left.append(rank, name);
+
+				const val = document.createElement("span");
+				val.className = "lb-val";
+				val.innerHTML = valFn(p);
+
+				row.append(left, val);
+				body.append(row);
+			});
+		}
+		card.append(body);
+		return card;
+	}
+
+	container.append(
+		makeCard("🏏 Top Run Scorers", lb.top_runs, (p) => `${p.batting.runs} <small class="lb-subval">(${p.batting.innings} inn · SR ${p.batting.strike_rate})</small>`),
+		makeCard("🎯 Top Wicket Takers", lb.top_wickets, (p) => `${p.bowling.wickets} <small class="lb-subval">(${p.bowling.overs} ov · Econ ${p.bowling.economy})</small>`),
+		makeCard("💥 Most Sixes", lb.top_sixes, (p) => `${p.batting.sixes} <small class="lb-subval">sixes</small>`),
+		makeCard("⚡ Best Economy", lb.best_economy, (p) => `${p.bowling.economy} <small class="lb-subval">(${p.bowling.overs} ov)</small>`),
+	);
+}
+
+let playerDirPage = 1;
+const DIR_PER_PAGE = 5;
+
+function renderPlayerDirectory(stats, filterQuery = "") {
+	const tbody = $("playerStatsBody");
+	if (!tbody) return;
+	tbody.innerHTML = "";
+
+	const pagEl = $("playerStatsPagination");
+	if (pagEl) pagEl.innerHTML = "";
+
+	const q = (filterQuery || "").trim().toLowerCase();
+	const filtered = (stats || []).filter((p) => !q || p.name.toLowerCase().includes(q));
+
+	if (!filtered.length) {
+		tbody.innerHTML = '<tr><td colspan="9" class="hint" style="text-align:center;padding:16px">No players found.</td></tr>';
+		return;
+	}
+
+	const totalPages = Math.ceil(filtered.length / DIR_PER_PAGE) || 1;
+	if (playerDirPage > totalPages) playerDirPage = totalPages;
+	if (playerDirPage < 1) playerDirPage = 1;
+
+	const start = (playerDirPage - 1) * DIR_PER_PAGE;
+	const end = start + DIR_PER_PAGE;
+	const pageItems = filtered.slice(start, end);
+
+	pageItems.forEach((p) => {
+		const b = p.batting;
+		const bw = p.bowling;
+		const tr = document.createElement("tr");
+		tr.onclick = () => showPlayerCareerModal(p.name);
+		tr.innerHTML = `
+			<td class="sc-col-player"><strong>${p.name}</strong></td>
+			<td class="sc-num">${p.matches}</td>
+			<td class="sc-num"><strong>${b.runs}</strong></td>
+			<td class="sc-num">${b.hs_display}</td>
+			<td class="sc-num">${b.average !== null ? b.average : "—"}</td>
+			<td class="sc-num">${b.strike_rate}</td>
+			<td class="sc-num"><strong>${bw.wickets}</strong></td>
+			<td class="sc-num">${bw.best_bowling}</td>
+			<td class="sc-num">${bw.economy}</td>
+		`;
+		tbody.append(tr);
+	});
+
+	if (pagEl) {
+		const info = document.createElement("span");
+		info.className = "pagination-info";
+		info.textContent = `Page ${playerDirPage} of ${totalPages} (${filtered.length} players)`;
+
+		const controls = document.createElement("div");
+		controls.className = "pagination-nav";
+
+		const prevBtn = document.createElement("button");
+		prevBtn.type = "button";
+		prevBtn.className = "pagination-btn";
+		prevBtn.textContent = "‹ Prev";
+		prevBtn.disabled = playerDirPage <= 1;
+		prevBtn.onclick = () => {
+			if (playerDirPage > 1) {
+				playerDirPage--;
+				renderPlayerDirectory(stats, filterQuery);
+			}
+		};
+		controls.append(prevBtn);
+
+		const maxButtons = 5;
+		let startBtn = Math.max(1, playerDirPage - 2);
+		let endBtn = Math.min(totalPages, startBtn + maxButtons - 1);
+		if (endBtn - startBtn < maxButtons - 1) {
+			startBtn = Math.max(1, endBtn - maxButtons + 1);
+		}
+
+		for (let i = startBtn; i <= endBtn; i++) {
+			const pBtn = document.createElement("button");
+			pBtn.type = "button";
+			pBtn.className = "pagination-btn" + (i === playerDirPage ? " active" : "");
+			pBtn.textContent = i;
+			const targetPage = i;
+			pBtn.onclick = () => {
+				playerDirPage = targetPage;
+				renderPlayerDirectory(stats, filterQuery);
+			};
+			controls.append(pBtn);
+		}
+
+		const nextBtn = document.createElement("button");
+		nextBtn.type = "button";
+		nextBtn.className = "pagination-btn";
+		nextBtn.textContent = "Next ›";
+		nextBtn.disabled = playerDirPage >= totalPages;
+		nextBtn.onclick = () => {
+			if (playerDirPage < totalPages) {
+				playerDirPage++;
+				renderPlayerDirectory(stats, filterQuery);
+			}
+		};
+		controls.append(nextBtn);
+
+		pagEl.append(info, controls);
+	}
+}
+
+async function showPlayerCareerModal(playerName) {
+	try {
+		const pRes = await api("player_stats&name=" + encodeURIComponent(playerName));
+		const p = pRes.player;
+		if (!p) return;
+
+		const b = p.batting;
+		const bw = p.bowling;
+
+		const customContent = (container) => {
+			const hero = document.createElement("div");
+			hero.className = "career-hero";
+			hero.innerHTML = `
+				<h2>${p.name}</h2>
+				<p>${p.matches} Matches played across completed matches</p>
+			`;
+
+			const batSub = document.createElement("div");
+			batSub.className = "career-subhead";
+			batSub.textContent = "Batting Career";
+
+			const batSummary = document.createElement("div");
+			batSummary.className = "career-stats-summary";
+			batSummary.innerHTML = `
+				<div class="career-stat-box"><span class="career-stat-val">${b.innings}</span><span class="career-stat-lbl">Innings</span></div>
+				<div class="career-stat-box"><span class="career-stat-val">${b.runs}</span><span class="career-stat-lbl">Runs</span></div>
+				<div class="career-stat-box"><span class="career-stat-val">${b.hs_display}</span><span class="career-stat-lbl">Highest</span></div>
+				<div class="career-stat-box"><span class="career-stat-val">${b.average !== null ? b.average : "—"}</span><span class="career-stat-lbl">Average</span></div>
+				<div class="career-stat-box"><span class="career-stat-val">${b.strike_rate}</span><span class="career-stat-lbl">SR</span></div>
+				<div class="career-stat-box"><span class="career-stat-val">${b.fours} / ${b.sixes}</span><span class="career-stat-lbl">4s / 6s</span></div>
+				<div class="career-stat-box"><span class="career-stat-val">${b.fifties} / ${b.hundreds}</span><span class="career-stat-lbl">50s / 100s</span></div>
+			`;
+
+			const bowlSub = document.createElement("div");
+			bowlSub.className = "career-subhead";
+			bowlSub.textContent = "Bowling Career";
+
+			const bowlSummary = document.createElement("div");
+			bowlSummary.className = "career-stats-summary";
+			bowlSummary.innerHTML = `
+				<div class="career-stat-box"><span class="career-stat-val">${bw.innings}</span><span class="career-stat-lbl">Innings</span></div>
+				<div class="career-stat-box"><span class="career-stat-val">${bw.overs}</span><span class="career-stat-lbl">Overs</span></div>
+				<div class="career-stat-box"><span class="career-stat-val">${bw.maidens}</span><span class="career-stat-lbl">Maidens</span></div>
+				<div class="career-stat-box"><span class="career-stat-val">${bw.wickets}</span><span class="career-stat-lbl">Wickets</span></div>
+				<div class="career-stat-box"><span class="career-stat-val">${bw.best_bowling}</span><span class="career-stat-lbl">BBI</span></div>
+				<div class="career-stat-box"><span class="career-stat-val">${bw.economy}</span><span class="career-stat-lbl">Economy</span></div>
+				<div class="career-stat-box"><span class="career-stat-val">${bw.average !== null ? bw.average : "—"}</span><span class="career-stat-lbl">Avg</span></div>
+			`;
+
+			container.append(hero, batSub, batSummary, bowlSub, bowlSummary);
+
+			if (p.match_log && p.match_log.length) {
+				const logSection = document.createElement("div");
+				logSection.className = "match-log-section";
+
+				const allLogs = (p.match_log || []).slice().reverse();
+				const perPage = 3;
+				let currentPage = 1;
+				const totalPages = Math.ceil(allLogs.length / perPage) || 1;
+
+				const logSub = document.createElement("div");
+				logSub.className = "career-subhead";
+				logSub.textContent = `Match Log (${allLogs.length})`;
+
+				const tableWrap = document.createElement("div");
+				tableWrap.className = "table-wrap";
+				tableWrap.style.margin = "6px 0 8px";
+
+				const table = document.createElement("table");
+				table.className = "career-log-table";
+				table.innerHTML = `
+					<thead>
+						<tr>
+							<th style="text-align:left">Match</th>
+							<th>Type</th>
+							<th>Performance</th>
+						</tr>
+					</thead>
+				`;
+				const tbody = document.createElement("tbody");
+				table.append(tbody);
+				tableWrap.append(table);
+
+				const pagNav = document.createElement("div");
+				pagNav.className = "log-pagination";
+
+				function renderLogPage() {
+					tbody.innerHTML = "";
+					const start = (currentPage - 1) * perPage;
+					const end = start + perPage;
+					const pageItems = allLogs.slice(start, end);
+
+					pageItems.forEach((entry) => {
+						const tr = document.createElement("tr");
+						tr.className = "log-row";
+						tr.innerHTML = `
+							<td style="text-align:left">
+								<strong>${esc(entry.title)}</strong>
+								<span style="display:block;font-size:9px;color:var(--muted)">${esc((entry.date || "").slice(0, 10))}</span>
+							</td>
+							<td>${entry.type === "batting" ? "🏏 Bat" : "⚾ Bowl"}</td>
+							<td class="sc-num">
+								${entry.type === "batting"
+									? `<strong>${entry.runs}</strong> (${entry.balls}b) · ${esc(entry.dismissal)}`
+									: `<strong>${entry.wickets}/${entry.runs_conceded}</strong> (${entry.overs} ov, Econ ${entry.econ})`}
+							</td>
+						`;
+						if (entry.match_id) {
+							tr.title = "View match scoreboard";
+							tr.onclick = async () => {
+								closeModal(false);
+								await openMatch(entry.match_id);
+							};
+						}
+						tbody.append(tr);
+					});
+
+					pagNav.innerHTML = "";
+					const info = document.createElement("span");
+					info.className = "log-pag-info";
+					info.textContent = `Page ${currentPage} of ${totalPages} (${allLogs.length} total)`;
+
+					const controls = document.createElement("div");
+					controls.className = "log-pag-nav";
+
+					const prevBtn = document.createElement("button");
+					prevBtn.type = "button";
+					prevBtn.className = "log-pag-btn";
+					prevBtn.textContent = "‹ Prev";
+					prevBtn.disabled = currentPage <= 1;
+					prevBtn.onclick = () => {
+						if (currentPage > 1) {
+							currentPage--;
+							renderLogPage();
+						}
+					};
+					controls.append(prevBtn);
+
+					const maxButtons = 5;
+					let startBtn = Math.max(1, currentPage - 2);
+					let endBtn = Math.min(totalPages, startBtn + maxButtons - 1);
+					if (endBtn - startBtn < maxButtons - 1) {
+						startBtn = Math.max(1, endBtn - maxButtons + 1);
+					}
+
+					for (let i = startBtn; i <= endBtn; i++) {
+						const pBtn = document.createElement("button");
+						pBtn.type = "button";
+						pBtn.className = "log-pag-btn" + (i === currentPage ? " active" : "");
+						pBtn.textContent = i;
+						const targetPage = i;
+						pBtn.onclick = () => {
+							currentPage = targetPage;
+							renderLogPage();
+						};
+						controls.append(pBtn);
+					}
+
+					const nextBtn = document.createElement("button");
+					nextBtn.type = "button";
+					nextBtn.className = "log-pag-btn";
+					nextBtn.textContent = "Next ›";
+					nextBtn.disabled = currentPage >= totalPages;
+					nextBtn.onclick = () => {
+						if (currentPage < totalPages) {
+							currentPage++;
+							renderLogPage();
+						}
+					};
+					controls.append(nextBtn);
+
+					pagNav.append(info, controls);
+				}
+
+				renderLogPage();
+				logSection.append(logSub, tableWrap, pagNav);
+				container.append(logSection);
+			}
+
+			if (isAdmin) {
+				const adminActions = document.createElement("div");
+				adminActions.className = "career-actions";
+				const renameBtn = document.createElement("button");
+				renameBtn.type = "button";
+				renameBtn.className = "ghost";
+				renameBtn.textContent = "Rename player";
+				renameBtn.onclick = () => {
+					closeModal(false);
+					setTimeout(() => showRenamePlayerModal(p), 60);
+				};
+
+				const delBtn = document.createElement("button");
+				delBtn.type = "button";
+				delBtn.className = "ghost error";
+				delBtn.textContent = "Delete player";
+				delBtn.onclick = () => {
+					closeModal(false);
+					setTimeout(async () => {
+						const ok = await showModal({
+							title: "Delete Player",
+							message: `Are you sure you want to delete "${p.name}" from the player directory? (Past match scorecards remain preserved.)`,
+							confirmLabel: "Delete Player",
+							showCancel: true,
+							showClose: true,
+						});
+						if (ok) {
+							try {
+								await api("player_delete", "POST", { id: p.id });
+								await loadCommonPlayers();
+								if (mainTab === "stats") {
+									await loadPlayerStats();
+								} else {
+									renderRosterChips();
+								}
+							} catch (err) {
+								showError(err.message);
+							}
+						}
+					}, 60);
+				};
+
+				adminActions.append(renameBtn, delBtn);
+				container.append(adminActions);
+			}
+		};
+
+		await showModal({
+			title: "Player Profile",
+			message: "",
+			confirmLabel: "Close",
+			showCancel: false,
+			showClose: true,
+			customContent,
+		});
+	} catch (e) {
+		showError(e.message);
+	}
+}
+
+async function showAddPlayerModal(prefill = "") {
+	let enteredName = prefill || "";
+	while (true) {
+		let inputRef = null;
+		const content = (container) => {
+			const row = document.createElement("div");
+			row.className = "modal-custom-row";
+
+			const label = document.createElement("label");
+			label.textContent = "Player Name";
+
+			const input = document.createElement("input");
+			input.type = "text";
+			input.className = "modal-input";
+			input.placeholder = "Enter player name (e.g. Virat Kohli)";
+			input.value = enteredName;
+			input.autocomplete = "off";
+			inputRef = input;
+
+			input.oninput = () => {
+				enteredName = input.value;
+			};
+			input.onkeydown = (e) => {
+				if (e.key === "Enter") {
+					e.preventDefault();
+					closeModal(true);
+				}
+			};
+
+			row.append(label, input);
+			container.append(row);
+
+			setTimeout(() => {
+				input.focus();
+				if (enteredName) input.select();
+			}, 80);
+		};
+
+		const ok = await showModal({
+			title: "Add Player",
+			message: "Register a new player in the common directory:",
+			confirmLabel: "Add Player",
+			showCancel: true,
+			showClose: true,
+			customContent: content,
+		});
+
+		if (!ok) return null;
+
+		const name = (inputRef ? inputRef.value : enteredName).trim();
+		if (!name) {
+			await showError("Player name cannot be empty.");
+			continue;
+		}
+
+		const existing = commonPlayers.find(
+			(p) => p.toLowerCase() === name.toLowerCase(),
+		);
+		if (existing) {
+			await showError(`"${existing}" already exists in the player directory.`);
+			continue;
+		}
+
+		try {
+			await api("player_create", "POST", { name });
+			await loadCommonPlayers();
+			if (mainTab === "stats") {
+				await loadPlayerStats();
+			} else {
+				renderRosterChips();
+			}
+			return name;
+		} catch (err) {
+			await showError(err.message);
+			continue;
+		}
+	}
+}
+
+async function showRenamePlayerModal(p) {
+	let enteredName = p.name;
+	while (true) {
+		let inputRef = null;
+		const content = (container) => {
+			const row = document.createElement("div");
+			row.className = "modal-custom-row";
+
+			const label = document.createElement("label");
+			label.textContent = "Player Name";
+
+			const input = document.createElement("input");
+			input.type = "text";
+			input.className = "modal-input";
+			input.placeholder = "Enter new player name...";
+			input.value = enteredName;
+			input.autocomplete = "off";
+			inputRef = input;
+
+			input.oninput = () => {
+				enteredName = input.value;
+			};
+			input.onkeydown = (e) => {
+				if (e.key === "Enter") {
+					e.preventDefault();
+					closeModal(true);
+				}
+			};
+
+			row.append(label, input);
+			container.append(row);
+
+			setTimeout(() => {
+				input.focus();
+				input.select();
+			}, 80);
+		};
+
+		const ok = await showModal({
+			title: "Rename Player",
+			message: `Update player name for "${p.name}":`,
+			confirmLabel: "Save Name",
+			showCancel: true,
+			showClose: true,
+			customContent: content,
+		});
+
+		if (!ok) return null;
+
+		const newName = (inputRef ? inputRef.value : enteredName).trim();
+		if (!newName) {
+			await showError("Player name cannot be empty.");
+			continue;
+		}
+		if (newName === p.name) return p.name;
+
+		const existing = commonPlayers.find(
+			(cp) => cp.toLowerCase() === newName.toLowerCase() && cp.toLowerCase() !== p.name.toLowerCase(),
+		);
+		if (existing) {
+			await showError(`A player named "${existing}" already exists.`);
+			continue;
+		}
+
+		try {
+			await api("player_update", "POST", { id: p.id, name: newName });
+			await loadCommonPlayers();
+			if (mainTab === "stats") {
+				await loadPlayerStats();
+			} else {
+				renderRosterChips();
+			}
+			return newName;
+		} catch (err) {
+			await showError(err.message);
+			continue;
+		}
 	}
 }
 function esc(s) {
@@ -838,6 +1701,7 @@ async function openMatch(id) {
 	$("matchTitle").textContent = matchTitleText(state);
 	show("app");
 	$("matchesView").classList.add("hidden");
+	$("statsView").classList.add("hidden");
 	$("setupView").classList.add("hidden");
 	$("scoreView").classList.remove("hidden");
 	headerMode();
@@ -2435,4 +3299,61 @@ const tabLive = $("tabLive");
 if (tabLive) tabLive.onclick = () => setScoreTab("live");
 const tabScorecard = $("tabScorecard");
 if (tabScorecard) tabScorecard.onclick = () => setScoreTab("scorecard");
+
+const tabMatches = $("tabMatches");
+if (tabMatches) tabMatches.onclick = () => setMainTab("matches");
+const tabStats = $("tabStats");
+if (tabStats) tabStats.onclick = () => setMainTab("stats");
+
+const addPBtn = $("addPlayerBtn");
+if (addPBtn) {
+	addPBtn.onclick = () => showAddPlayerModal();
+}
+
+const dirSearch = $("playerDirSearch");
+if (dirSearch) {
+	dirSearch.oninput = (e) => {
+		playerStatsFilter = e.target.value;
+		playerDirPage = 1;
+		renderPlayerDirectory(playerStatsData, playerStatsFilter);
+	};
+}
+
+const pSearchA = $("playerSearchA");
+if (pSearchA) {
+	pSearchA.oninput = (e) => {
+		poolSearchA = e.target.value;
+		renderRosterChips();
+	};
+	pSearchA.onkeydown = (e) => {
+		if (e.key === "Enter") {
+			e.preventDefault();
+			handleAddChipInput("A");
+		}
+	};
+}
+const pSearchB = $("playerSearchB");
+if (pSearchB) {
+	pSearchB.oninput = (e) => {
+		poolSearchB = e.target.value;
+		renderRosterChips();
+	};
+	pSearchB.onkeydown = (e) => {
+		if (e.key === "Enter") {
+			e.preventDefault();
+			handleAddChipInput("B");
+		}
+	};
+}
+
+const addChipABtn = $("addChipA");
+if (addChipABtn) addChipABtn.onclick = () => handleAddChipInput("A");
+const addChipBBtn = $("addChipB");
+if (addChipBBtn) addChipBBtn.onclick = () => handleAddChipInput("B");
+
+const autoFillABtn = $("autoFillA");
+if (autoFillABtn) autoFillABtn.onclick = () => autoFillRoster("A");
+const autoFillBBtn = $("autoFillB");
+if (autoFillBBtn) autoFillBBtn.onclick = () => autoFillRoster("B");
+
 boot();
