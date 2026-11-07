@@ -296,13 +296,41 @@ function matchDayLabel(key) {
 	if (diff === 1) return "Yesterday · " + nice;
 	return nice;
 }
+function cardInnings(deliveries) {
+	let total = 0,
+		w = 0,
+		legal = 0;
+	(deliveries || []).forEach((d) => {
+		total += (d.runs || 0) + (d.extra_runs || 0);
+		if (d.wicket) w++;
+		if (isLegalBall(d)) legal++;
+	});
+	return { total, w, legal };
+}
 function makeMatchCard(m) {
 	const d = document.createElement("div");
 	d.className = "match-card";
 	const info = document.createElement("div");
 	const s = m.state;
-	const result = s.result && s.result.text ? " · " + esc(s.result.text) : "";
-	info.innerHTML = `<strong>${esc(s.team_a)} vs ${esc(s.team_b)}</strong><small>${s.overs_limit} overs · ${esc(s.status || "live")}${result}</small>`;
+	const name = document.createElement("strong");
+	name.textContent =
+		(s.team_a || "") + " vs " + (s.team_b || "") + " (" + (s.overs_limit || 0) + ")";
+	const sub = document.createElement("small");
+	const past = s.innings_1 && (s.innings_1.deliveries || []).length;
+	const started = (s.deliveries || []).length || past;
+	if (started) {
+		const st = cardInnings(s.deliveries || []);
+		const score = document.createElement("b");
+		score.textContent = st.total + "/" + st.w + " (" + oversText(st.legal) + ")";
+		const tag = document.createElement("span");
+		const done = (s.status || "") === "complete";
+		tag.className = "match-tag" + (done ? "" : " live");
+		tag.textContent = done ? (s.result && s.result.text) || "Complete" : "Live";
+		sub.className = "match-score";
+		sub.append(score, tag);
+		info.append(sub);
+	}
+	info.prepend(name);
 	const actions = document.createElement("div");
 	actions.className = "match-actions";
 	const open = document.createElement("button");

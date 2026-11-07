@@ -5,7 +5,7 @@
 /* Form layouts */
 .form-stack{display:flex;flex-direction:column;gap:14px}.team-block{display:grid;grid-template-columns:1fr 1fr;gap:12px;background:#f0f7ff;border:1px solid var(--line);border-radius:12px;padding:14px}.full{grid-column:1/-1}
 /* Match list */
-.match-list{display:grid;gap:12px}.match-card{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:11px;padding:14px;gap:10px;background:#fff}.match-card strong{display:block}.match-card small{color:var(--muted)}.match-actions{display:flex;align-items:center;gap:8px}.match-actions button{width:92px;margin:0;padding:8px 10px;text-align:center}
+.match-list{display:grid;gap:12px}.match-card{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:11px;padding:14px;gap:10px;background:#fff}.match-card strong{display:block}.match-card small{color:var(--muted)}.match-score{display:flex;align-items:center;gap:8px;margin-top:2px}.match-score b{font:800 22px 'Barlow Condensed';color:var(--blue);letter-spacing:.2px;line-height:1}.match-tag{font-size:10px;font-weight:800;letter-spacing:.4px;padding:3px 8px;border-radius:99px;background:#eef4fb;color:var(--muted)}.match-tag.live{background:var(--gold);color:#002868}.match-actions{display:flex;align-items:center;gap:8px}.match-actions button{width:92px;margin:0;padding:8px 10px;text-align:center}
 .match-day{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 4px 20px #0030870d}
 .match-day-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;cursor:pointer;list-style:none;font-weight:800}
 .match-day-summary::-webkit-details-marker{display:none}
