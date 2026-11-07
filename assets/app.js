@@ -67,7 +67,13 @@ function startViewerPoll() {
 			const closed = overJustClosed(prev, r.state);
 			const inningsChanged =
 				prev && prev.innings === 1 && r.state && r.state.innings === 2;
+			const wasComplete = prev && prev.status === "complete";
 			state = r.state;
+			if (!wasComplete && isComplete()) {
+				activeScoreTab = "scorecard";
+			} else if (wasComplete && !isComplete()) {
+				activeScoreTab = "live";
+			}
 			render();
 			if (inningsChanged) {
 				const beforeLegal = legalCount(prev);
@@ -337,6 +343,7 @@ $("setupForm").onsubmit = async (e) => {
 		if (editingMatch && current) {
 			const r = await api("update", "POST", body, current);
 			state = r.state;
+			activeScoreTab = isComplete() ? "scorecard" : "live";
 			$("matchTitle").textContent = matchTitleText(state);
 			editingMatch = false;
 			$("setupView").classList.add("hidden");
@@ -480,6 +487,8 @@ async function markMatchFromCard(m) {
 		const r = await api("mark_complete", "POST", {}, m.id);
 		if (!wasLive) return loadMatches();
 		state = r.state;
+		activeScoreTab = "scorecard";
+		render();
 		await notifyPhaseChange();
 	} catch (e) {
 		showError(e.message);
@@ -820,6 +829,8 @@ async function openMatch(id) {
 	const r = await api("get", "GET", null, id);
 	current = id;
 	state = r.state;
+	activeScoreTab = isComplete() ? "scorecard" : "live";
+	openScorecardInningsKey = null;
 	editingMatch = false;
 	setPendingExtra("");
 	Object.keys(overSectionOpen).forEach((k) => delete overSectionOpen[k]);
@@ -885,7 +896,7 @@ function matchTitleText(s) {
 	);
 }
 function isComplete() {
-	return state.status === "complete";
+	return Boolean(state && state.status === "complete");
 }
 function isLegalBall(d) {
 	return !["wide", "no-ball"].includes(d.extra_type || "");
@@ -1215,6 +1226,404 @@ function setPendingExtra(type) {
 	if (!type) pendingWicket = false;
 	syncPendingButtons();
 }
+let activeScoreTab = "live";
+let openScorecardInningsKey = null;
+function setScoreTab(tab) {
+	activeScoreTab = tab;
+	render();
+}
+function teamName(s, side) {
+	return side === "B" ? s.team_b || "Team B" : s.team_a || "Team A";
+}
+function computeInningsScorecard(
+	deliveries,
+	batRoster,
+	bowRoster,
+	crease = null,
+	isLive = false,
+) {
+	const batting = {};
+	const bowling = {};
+	const fow = [];
+	let totalRuns = 0;
+	let totalWickets = 0;
+	let legalBalls = 0;
+	const extras = {
+		wide: 0,
+		noBall: 0,
+		bye: 0,
+		legBye: 0,
+		overthrow: 0,
+		total: 0,
+	};
+
+	(batRoster || []).forEach((name) => {
+		batting[name] = {
+			name,
+			runs: 0,
+			balls: 0,
+			fours: 0,
+			sixes: 0,
+			isOut: false,
+			dismissal: "not out",
+			hasBatted: false,
+		};
+	});
+
+	(bowRoster || []).forEach((name) => {
+		bowling[name] = {
+			name,
+			balls: 0,
+			runs: 0,
+			maidens: 0,
+			wickets: 0,
+			wides: 0,
+			noBalls: 0,
+			dots: 0,
+		};
+	});
+
+	(deliveries || []).forEach((d) => {
+		const bat = d.batter || d.striker;
+		const ns = d.non_striker;
+		const bow = d.bowler;
+		const isLegal = !["wide", "no-ball"].includes(d.extra_type || "");
+		const runs = d.runs || 0;
+		const exr = d.extra_runs || 0;
+		const exType = d.extra_type || "";
+		const ballTotal = runs + exr;
+
+		totalRuns += ballTotal;
+
+		if (batting[bat]) {
+			batting[bat].hasBatted = true;
+			batting[bat].runs += runs + (exType === "overthrow" ? exr : 0);
+			if (isLegal) batting[bat].balls++;
+			if (runs === 4 && exType !== "overthrow") batting[bat].fours++;
+			if (runs === 6 && exType !== "overthrow") batting[bat].sixes++;
+		}
+		if (ns && batting[ns]) {
+			batting[ns].hasBatted = true;
+		}
+
+		if (exType === "wide") {
+			extras.wide += exr;
+			extras.total += exr;
+			if (bowling[bow]) bowling[bow].wides++;
+		} else if (exType === "no-ball") {
+			extras.noBall += exr;
+			extras.total += exr;
+			if (bowling[bow]) bowling[bow].noBalls++;
+		} else if (exType === "bye") {
+			extras.bye += exr;
+			extras.total += exr;
+		} else if (exType === "leg-bye") {
+			extras.legBye += exr;
+			extras.total += exr;
+		} else if (exType === "overthrow") {
+			extras.overthrow += exr;
+			extras.total += exr;
+		}
+
+		if (bowling[bow]) {
+			const bowlerCharge = ["bye", "leg-bye"].includes(exType) ? 0 : ballTotal;
+			bowling[bow].runs += bowlerCharge;
+			if (isLegal) {
+				bowling[bow].balls++;
+				if (ballTotal === 0) bowling[bow].dots++;
+			}
+		}
+
+		if (isLegal) legalBalls++;
+
+		if (d.wicket) {
+			totalWickets++;
+			const outPerson = d.dismissed_player || bat;
+			if (batting[outPerson]) {
+				batting[outPerson].hasBatted = true;
+				batting[outPerson].isOut = true;
+				const dis = d.dismissal || "bowled";
+				if (dis === "run out") {
+					batting[outPerson].dismissal = "run out";
+				} else if (dis === "bowled") {
+					batting[outPerson].dismissal = `b ${bow}`;
+				} else if (dis === "caught") {
+					batting[outPerson].dismissal = `c & b ${bow}`;
+				} else if (dis === "lbw") {
+					batting[outPerson].dismissal = `lbw b ${bow}`;
+				} else if (dis === "stumped") {
+					batting[outPerson].dismissal = `st † b ${bow}`;
+				} else if (dis === "hit wicket") {
+					batting[outPerson].dismissal = `hit wicket b ${bow}`;
+				} else {
+					batting[outPerson].dismissal = `${dis} b ${bow}`;
+				}
+			}
+			if (bowling[bow] && !["run out", "retired hurt"].includes(d.dismissal)) {
+				bowling[bow].wickets++;
+			}
+			fow.push({
+				score: totalRuns,
+				wicketNum: totalWickets,
+				player: outPerson,
+				over: oversText(legalBalls),
+			});
+		}
+	});
+
+	if (isLive && crease) {
+		if (crease.striker && batting[crease.striker]) {
+			batting[crease.striker].hasBatted = true;
+			if (!batting[crease.striker].isOut) {
+				batting[crease.striker].dismissal = "batting *";
+			}
+		}
+		if (crease.non_striker && batting[crease.non_striker]) {
+			batting[crease.non_striker].hasBatted = true;
+			if (!batting[crease.non_striker].isOut) {
+				batting[crease.non_striker].dismissal = "not out *";
+			}
+		}
+	}
+
+	const oversGrouped = groupOvers(deliveries || []);
+	oversGrouped.forEach((ov) => {
+		if (ov.complete && ov.balls.length > 0) {
+			const b = ov.balls[0].bowler;
+			if (overRuns(ov.balls) === 0 && bowling[b]) {
+				bowling[b].maidens++;
+			}
+		}
+	});
+
+	return {
+		batting,
+		bowling,
+		extras,
+		fow,
+		totalRuns,
+		totalWickets,
+		legalBalls,
+		batRoster,
+	};
+}
+function renderScorecardHTML(title, data, isOpen, inningsKey) {
+	const rr =
+		data.legalBalls > 0
+			? (data.totalRuns / (data.legalBalls / 6)).toFixed(2)
+			: "0.00";
+	let html = `
+		<details class="over-team scorecard-innings" name="scorecard-accordion" data-innings="${inningsKey}" ${isOpen ? "open" : ""}>
+			<summary class="over-team-summary scorecard-innings-head">
+				<span class="over-team-name">${title}</span>
+				<span class="over-team-score">${data.totalRuns}/${data.totalWickets} (${oversText(data.legalBalls)} Ov)</span>
+			</summary>
+			<div class="over-team-body scorecard-innings-body">
+			<table class="sc-table">
+				<thead>
+					<tr>
+						<th class="sc-col-player">Batting</th>
+						<th>R</th>
+						<th>B</th>
+						<th>4s</th>
+						<th>6s</th>
+						<th>SR</th>
+					</tr>
+				</thead>
+				<tbody>
+	`;
+
+	const didNotBat = [];
+	(data.batRoster || Object.keys(data.batting)).forEach((name) => {
+		const b = data.batting[name];
+		if (b && b.hasBatted) {
+			const sr = b.balls > 0 ? ((b.runs / b.balls) * 100).toFixed(1) : "0.0";
+			html += `
+				<tr>
+					<td class="sc-col-player">
+						<span class="sc-player-name">${b.name}</span>
+						<span class="sc-dismissal">${b.dismissal}</span>
+					</td>
+					<td class="sc-num"><strong>${b.runs}</strong></td>
+					<td class="sc-num">${b.balls}</td>
+					<td class="sc-num">${b.fours}</td>
+					<td class="sc-num">${b.sixes}</td>
+					<td class="sc-num">${sr}</td>
+				</tr>
+			`;
+		} else {
+			didNotBat.push(name);
+		}
+	});
+
+	const ex = data.extras;
+	html += `
+					<tr class="sc-sub-row">
+						<td class="sc-col-player">Extras</td>
+						<td colspan="5" class="sc-extras-detail">
+							<strong>${ex.total}</strong> (w ${ex.wide}, nb ${ex.noBall}, b ${ex.bye}, lb ${ex.legBye})
+						</td>
+					</tr>
+					<tr class="sc-total-row">
+						<td class="sc-col-player">Total</td>
+						<td colspan="5">
+							<strong>${data.totalRuns}/${data.totalWickets}</strong> (${oversText(data.legalBalls)} Ov, RR ${rr})
+						</td>
+					</tr>
+				</tbody>
+			</table>
+	`;
+
+	if (didNotBat.length) {
+		html += `
+			<div class="sc-dnb">
+				<span class="sc-dnb-label">Yet to bat:</span>
+				<span class="sc-dnb-list">${didNotBat.join(", ")}</span>
+			</div>
+		`;
+	}
+
+	if (data.fow && data.fow.length) {
+		html += `
+			<div class="sc-fow-section">
+				<span class="sc-fow-label">Fall of Wickets</span>
+				<div class="sc-fow-chips">
+		`;
+		html += data.fow
+			.map(
+				(f) =>
+					`<span class="sc-fow-item"><strong>${f.score}-${f.wicketNum}</strong> (${f.player}, ${f.over} ov)</span>`,
+			)
+			.join(" · ");
+		html += `
+				</div>
+			</div>
+		`;
+	}
+
+	html += `
+			<table class="sc-table sc-bowling-table">
+				<thead>
+					<tr>
+						<th class="sc-col-player">Bowling</th>
+						<th>O</th>
+						<th>M</th>
+						<th>R</th>
+						<th>W</th>
+						<th>ECON</th>
+						<th>WD</th>
+						<th>NB</th>
+					</tr>
+				</thead>
+				<tbody>
+	`;
+
+	const bowlersWhoBowled = Object.values(data.bowling).filter(
+		(b) => b.balls > 0 || b.wides > 0 || b.noBalls > 0 || b.runs > 0,
+	);
+
+	if (!bowlersWhoBowled.length) {
+		html += `<tr><td colspan="8" class="hint" style="text-align:center">No bowling figures recorded yet.</td></tr>`;
+	} else {
+		bowlersWhoBowled.forEach((b) => {
+			const ov = oversText(b.balls);
+			const econ = b.balls > 0 ? (b.runs / (b.balls / 6)).toFixed(2) : "0.00";
+			html += `
+				<tr>
+					<td class="sc-col-player"><strong>${b.name}</strong></td>
+					<td class="sc-num">${ov}</td>
+					<td class="sc-num">${b.maidens}</td>
+					<td class="sc-num">${b.runs}</td>
+					<td class="sc-num"><strong>${b.wickets}</strong></td>
+					<td class="sc-num">${econ}</td>
+					<td class="sc-num">${b.wides}</td>
+					<td class="sc-num">${b.noBalls}</td>
+				</tr>
+			`;
+		});
+	}
+
+	html += `
+				</tbody>
+			</table>
+			</div>
+		</details>
+	`;
+
+	return html;
+}
+function renderDetailedScorecard() {
+	const container = $("scorecardContent");
+	if (!container || !state) return;
+
+	if (openScorecardInningsKey === null) {
+		openScorecardInningsKey =
+			state.innings === 2 || state.innings_1 ? "innings-2" : "innings-1";
+	}
+
+	let fullHTML = "";
+
+	if (state.innings_1) {
+		const i1 = state.innings_1;
+		const i1Side = i1.side || (state.batting_first === "B" ? "B" : "A");
+		const i1BatRoster = teamRoster(i1Side);
+		const i1BowRoster = teamRoster(i1Side === "B" ? "A" : "B");
+		const i1Data = computeInningsScorecard(
+			i1.deliveries || [],
+			i1BatRoster,
+			i1BowRoster,
+			i1.crease,
+			false,
+		);
+		const i1Title = `Innings 1: ${i1.team || teamName(state, i1Side)}`;
+		const isI1Open = openScorecardInningsKey === "innings-1";
+		fullHTML += renderScorecardHTML(i1Title, i1Data, isI1Open, "innings-1");
+	}
+
+	const curSide = battingSide();
+	const curBatRoster = battingRoster();
+	const curBowRoster = bowlingRoster();
+	const curData = computeInningsScorecard(
+		state.deliveries || [],
+		curBatRoster,
+		curBowRoster,
+		state.crease,
+		!isComplete(),
+	);
+	const curTitle = `Innings ${state.innings}: ${battingTeamName()}${!isComplete() ? " (Live)" : ""}`;
+	const curKey =
+		state.innings === 2 || state.innings_1 ? "innings-2" : "innings-1";
+	const isCurOpen = openScorecardInningsKey === curKey;
+	fullHTML += renderScorecardHTML(curTitle, curData, isCurOpen, curKey);
+
+	container.innerHTML = fullHTML;
+
+	container
+		.querySelectorAll("details.scorecard-innings")
+		.forEach((detailsEl) => {
+			detailsEl.addEventListener("toggle", () => {
+				if (detailsEl.open) {
+					openScorecardInningsKey = detailsEl.dataset.innings;
+					container
+						.querySelectorAll("details.scorecard-innings")
+						.forEach((other) => {
+							if (other !== detailsEl && other.open) {
+								other.open = false;
+							}
+						});
+				} else {
+					if (openScorecardInningsKey === detailsEl.dataset.innings) {
+						const anyOpen = container.querySelector(
+							"details.scorecard-innings[open]",
+						);
+						openScorecardInningsKey = anyOpen
+							? anyOpen.dataset.innings
+							: "none";
+					}
+				}
+			});
+		});
+}
 function render() {
 	headerMode();
 	$("matchTitle").textContent = matchTitleText(state);
@@ -1261,11 +1670,26 @@ function render() {
 		: state.innings === 2 && !(state.deliveries || []).length
 			? "Reopen innings"
 			: "↶ Undo";
+	const liveTabActive = activeScoreTab === "live";
+	const liveTab = $("tabLive");
+	const scTab = $("tabScorecard");
+	if (liveTab && scTab) {
+		liveTab.classList.toggle("active", liveTabActive);
+		scTab.classList.toggle("active", !liveTabActive);
+	}
 	$("recordPanel").classList.toggle(
 		"hidden",
-		!isAdmin || (isComplete() && !!state.locked),
+		!isAdmin || (isComplete() && !!state.locked) || !liveTabActive,
 	);
 	$("recordPanel").classList.toggle("scoring-locked", isComplete());
+	$("overCards").classList.toggle("hidden", !liveTabActive);
+	const scView = $("scorecardView");
+	if (scView) {
+		scView.classList.toggle("hidden", liveTabActive);
+		if (!liveTabActive) {
+			renderDetailedScorecard();
+		}
+	}
 	if (isComplete()) {
 		$("actionMessage").textContent =
 			state.result && state.result.text ? state.result.text : "Match complete.";
@@ -1788,6 +2212,9 @@ async function recordBallWithRotation({
 		pendingExtra = "";
 		pendingWicket = false;
 		syncPendingButtons();
+		if (isComplete() && prevStatus !== "complete") {
+			activeScoreTab = "scorecard";
+		}
 		render();
 
 		if (isComplete() && prevStatus !== "complete") {
@@ -1947,6 +2374,9 @@ $("undo").onclick = async () => {
 		const r = await api("undo", "POST", {}, current);
 		state = r.state;
 		setPendingExtra("");
+		if (!isComplete()) {
+			activeScoreTab = "live";
+		}
 		render();
 	} catch (e) {
 		showError(e.message);
@@ -1985,6 +2415,9 @@ $("endMatch").onclick = async () => {
 		const r = await api("end_match", "POST", {}, current);
 		state = r.state;
 		setPendingExtra("");
+		if (isComplete()) {
+			activeScoreTab = "scorecard";
+		}
 		render();
 		await notifyPhaseChange();
 	} catch (e) {
@@ -1998,4 +2431,8 @@ $("modal").onclick = (e) => {
 	if (e.target === $("modal") && $("modal").dataset.allowDismiss === "1")
 		closeModal(false);
 };
+const tabLive = $("tabLive");
+if (tabLive) tabLive.onclick = () => setScoreTab("live");
+const tabScorecard = $("tabScorecard");
+if (tabScorecard) tabScorecard.onclick = () => setScoreTab("scorecard");
 boot();

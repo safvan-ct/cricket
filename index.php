@@ -190,6 +190,11 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
           </div>
         </div>
 
+        <div class="score-tabs">
+          <button type="button" id="tabLive" class="tab-btn active">Live & Scoring</button>
+          <button type="button" id="tabScorecard" class="tab-btn">Full Scorecard</button>
+        </div>
+
         <div class="panel" id="recordPanel">
           <div class="keypad">
             <button data-run="0">0</button>
@@ -212,6 +217,9 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
           <p id="actionMessage" class="hint">Tap a run, or an extra / wicket to add on runs.</p>
         </div>
         <div id="overCards"></div>
+        <div id="scorecardView" class="panel hidden">
+          <div id="scorecardContent"></div>
+        </div>
         <input type="hidden" id="batter" value="1"><input type="hidden" id="bowler" value="1">
       </div>
     </section>
