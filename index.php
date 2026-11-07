@@ -160,6 +160,7 @@
       <button type="button" id="modalClose" class="modal-close" aria-label="Close">×</button>
       <h2 id="modalTitle">Confirm</h2>
       <p id="modalMessage"></p>
+      <div id="modalBalls" class="modal-balls hidden"></div>
       <div id="modalFields" class="modal-fields hidden">
         <p id="modalAddonLabel" class="modal-addon-label">Add-on runs</p>
         <div class="modal-addon" role="radiogroup" aria-label="Add-on runs">

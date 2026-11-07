@@ -88,6 +88,9 @@
 .modal-actions{display:flex;justify-content:center;gap:8px}
 .modal-fields{display:flex;flex-direction:column;gap:12px;margin:0 0 18px}
 .modal-fields.hidden{display:none!important}
+.modal-balls{margin:12px 0 16px}
+.modal-balls.hidden{display:none!important}
+.modal-balls .over-card{margin-bottom:0;box-shadow:none}
 .modal-addon-label{margin:0;font-size:12px;font-weight:700;color:#3a5a7a}
 .modal-addon{display:flex;flex-wrap:wrap;gap:4px}
 .modal-addon-opt{flex:1;min-width:37px;margin:0;cursor:pointer;display:flex;align-items:center;justify-content:center;height:40px;border-radius:9px;background:#ddeaf5;color:#002868;font-weight:800;font-size:14px}

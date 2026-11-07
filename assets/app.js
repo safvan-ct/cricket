@@ -67,7 +67,8 @@ function startViewerPoll() {
 			const closed = overJustClosed(prev, r.state);
 			state = r.state;
 			render();
-			if (closed) await notifyOverComplete(closed);
+			if (closed)
+				await notifyOverComplete(closed, endedOverBalls(closed, r.state));
 		} catch (e) {}
 	}, 4000);
 }
@@ -900,6 +901,11 @@ function closeModal(ok) {
 	$("modal").classList.add("hidden");
 	$("modal").setAttribute("aria-hidden", "true");
 	document.removeEventListener("keydown", modalKey);
+	const ballsEl = $("modalBalls");
+	if (ballsEl) {
+		ballsEl.innerHTML = "";
+		ballsEl.classList.add("hidden");
+	}
 	if (modalResolve) {
 		const r = modalResolve;
 		modalResolve = null;
@@ -912,12 +918,40 @@ function showModal({
 	confirmLabel = "OK",
 	showCancel = false,
 	fields = false,
+	balls = null,
+	overNumber = 0,
 }) {
 	$("modalTitle").textContent = title;
 	$("modalMessage").textContent = message;
 	$("modalOk").textContent = confirmLabel;
 	$("modalClose").classList.toggle("hidden", !showCancel);
 	$("modalFields").classList.toggle("hidden", !fields);
+	const ballsEl = $("modalBalls");
+	if (ballsEl) {
+		ballsEl.innerHTML = "";
+		if (balls && balls.length) {
+			ballsEl.classList.remove("hidden");
+			const card = document.createElement("div");
+			card.className = "over-card";
+			const head = document.createElement("div");
+			head.className = "over-card-head";
+			const hTitle = document.createElement("h3");
+			hTitle.textContent = overNumber ? "Over " + overNumber : "This over";
+			const runs = document.createElement("span");
+			const r = overRuns(balls);
+			const w = balls.filter((d) => d.wicket).length;
+			runs.textContent =
+				r + " runs" + (w ? " · " + w + (w === 1 ? " wkt" : " wkts") : "");
+			head.append(hTitle, runs);
+			const chips = document.createElement("div");
+			chips.className = "over-card-balls";
+			balls.forEach((d) => chips.append(makeChip(d)));
+			card.append(head, chips);
+			ballsEl.append(card);
+		} else {
+			ballsEl.classList.add("hidden");
+		}
+	}
 	if (fields) {
 		const ovr = $("modalFields").classList.contains("overthrow-mode");
 		const val = ovr ? "1" : "0";
@@ -943,14 +977,22 @@ function showError(message) {
 		showCancel: false,
 	});
 }
-async function notifyOverComplete(n) {
+function endedOverBalls(n, customState = null) {
+	const s = customState || state;
+	const overs = groupOvers((s && s.deliveries) || []);
+	return (overs[n - 1] && overs[n - 1].balls) || [];
+}
+async function notifyOverComplete(n, balls = null) {
 	if (!n) return;
+	const overBalls = balls && balls.length ? balls : endedOverBalls(n);
 	await showModal({
 		title: "Over complete",
 		message:
 			overWord(n) + " over completed. " + overWord(n + 1) + " over start.",
 		confirmLabel: "OK",
 		showCancel: false,
+		balls: overBalls,
+		overNumber: n,
 	});
 }
 async function notifyPhaseChange() {
@@ -1012,7 +1054,8 @@ async function addDelivery(
 		if (isComplete() && prevStatus !== "complete") await notifyPhaseChange();
 		else if (state.innings === 2 && prevInnings === 1)
 			await notifyPhaseChange();
-		else if (closed) await notifyOverComplete(closed);
+		else if (closed)
+			await notifyOverComplete(closed, endedOverBalls(closed, r.state));
 		else $("actionMessage").textContent = "Delivery recorded.";
 	} catch (e) {
 		showError(e.message);
