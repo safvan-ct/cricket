@@ -271,7 +271,7 @@ $("setupForm").onsubmit = async (e) => {
 			await openMatch(r.id);
 		}
 	} catch (err) {
-		alert(err.message);
+		showError(err.message);
 	}
 };
 function matchDayKey(m) {
@@ -309,6 +309,24 @@ function cardInnings(deliveries) {
 	});
 	return { total, w, legal };
 }
+function cardScore(s) {
+	if ((s.deliveries || []).length) return cardInnings(s.deliveries);
+	if ((s.status || "") !== "complete") return cardInnings([]);
+	const inn2 = s.innings_2;
+	const inn1 = s.innings_1;
+	const snap =
+		inn2 && (inn2.deliveries || []).length
+			? inn2
+			: inn1 && (inn1.deliveries || []).length
+				? inn1
+				: inn2 || inn1;
+	if (!snap) return cardInnings([]);
+	return {
+		total: snap.total || 0,
+		w: snap.wickets || 0,
+		legal: snap.legal || 0,
+	};
+}
 function makeMatchCard(m) {
 	const d = document.createElement("div");
 	d.className = "match-card";
@@ -321,7 +339,7 @@ function makeMatchCard(m) {
 	const past = s.innings_1 && (s.innings_1.deliveries || []).length;
 	const started = (s.deliveries || []).length || past;
 	if (started) {
-		const st = cardInnings(s.deliveries || []);
+		const st = cardScore(s);
 		const score = document.createElement("b");
 		score.textContent = st.total + "/" + st.w + " (" + oversText(st.legal) + ")";
 		const tag = document.createElement("span");
@@ -363,7 +381,7 @@ function makeMatchCard(m) {
 				await api("delete", "POST", {}, m.id);
 				loadMatches();
 			} catch (e) {
-				alert(e.message);
+				showError(e.message);
 			}
 		};
 		actions.append(del);
@@ -386,7 +404,7 @@ async function markMatchFromCard(m) {
 		state = r.state;
 		await notifyPhaseChange();
 	} catch (e) {
-		alert(e.message);
+		showError(e.message);
 	}
 }
 async function loadMatches() {
@@ -426,7 +444,7 @@ async function loadMatches() {
 			$("matchList").append(details);
 		});
 	} catch (e) {
-		alert(e.message);
+		showError(e.message);
 	}
 }
 function esc(s) {
@@ -844,7 +862,15 @@ function render() {
 		!(isAdmin && live && state.innings === 2),
 	);
 	$("undo").classList.toggle("hidden", !!state.locked);
-	$("recordPanel").classList.toggle("hidden", !isAdmin);
+	$("undo").textContent = isComplete()
+		? "Reopen match"
+		: state.innings === 2 && !(state.deliveries || []).length
+			? "Reopen innings"
+			: "↶ Undo";
+	$("recordPanel").classList.toggle(
+		"hidden",
+		!isAdmin || (isComplete() && !!state.locked),
+	);
 	$("recordPanel").classList.toggle("scoring-locked", isComplete());
 	if (isComplete()) {
 		$("actionMessage").textContent =
@@ -901,6 +927,14 @@ function showModal({
 	document.addEventListener("keydown", modalKey);
 	return new Promise((res) => {
 		modalResolve = res;
+	});
+}
+function showError(message) {
+	return showModal({
+		title: "Error",
+		message: message || "Request failed",
+		confirmLabel: "OK",
+		showCancel: false,
 	});
 }
 async function notifyOverComplete(n) {
@@ -975,7 +1009,7 @@ async function addDelivery(
 		else if (closed) await notifyOverComplete(closed);
 		else $("actionMessage").textContent = "Delivery recorded.";
 	} catch (e) {
-		alert(e.message);
+		showError(e.message);
 	}
 }
 function commitExtra(type, additional, wicket) {
@@ -1041,9 +1075,12 @@ $("undo").onclick = async () => {
 	if (isComplete()) {
 		title = "Reopen match";
 		msg = "Reopen the completed match?";
-		confirmLabel = "Reopen";
-	} else if (state.innings === 2 && !(state.deliveries || []).length)
-		msg = "Undo end of innings?";
+		confirmLabel = "Reopen match";
+	} else if (state.innings === 2 && !(state.deliveries || []).length) {
+		title = "Reopen innings";
+		msg = "Reopen the innings?";
+		confirmLabel = "Reopen innings";
+	}
 	else if (!(state.deliveries || []).length) return;
 	const ok = await showModal({
 		title,
@@ -1058,7 +1095,7 @@ $("undo").onclick = async () => {
 		setPendingExtra("");
 		render();
 	} catch (e) {
-		alert(e.message);
+		showError(e.message);
 	}
 };
 $("endInnings").onclick = async () => {
@@ -1078,7 +1115,7 @@ $("endInnings").onclick = async () => {
 		$("actionMessage").textContent = "2nd innings — target " + state.target;
 		await notifyPhaseChange();
 	} catch (e) {
-		alert(e.message);
+		showError(e.message);
 	}
 };
 $("endMatch").onclick = async () => {
@@ -1097,7 +1134,7 @@ $("endMatch").onclick = async () => {
 		render();
 		await notifyPhaseChange();
 	} catch (e) {
-		alert(e.message);
+		showError(e.message);
 	}
 };
 $("modalOk").onclick = () => closeModal(true);

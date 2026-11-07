@@ -45,7 +45,7 @@
 .this-over-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px}
 .this-over-head .subhead{margin:0;color:#90b8d8}
 #thisOverRuns{font-size:12px;font-weight:700;color:#fff}
-.this-over-balls{display:flex;gap:6px;flex-wrap:wrap;min-height:28px}
+.this-over-balls{display:flex;gap:6px;flex-wrap:wrap;min-height:28px}.this-over-balls:empty{display:none;min-height:0}.this-over:has(.this-over-balls:empty) .this-over-head{margin-bottom:0}
 .this-over-balls .ball-chip{background:#1a3a6a;color:#c8dff0;border:1px solid #2a4878}
 .this-over-balls .ball-chip.boundary{background:var(--gold);color:#002868;border-color:var(--gold)}
 .this-over-balls .ball-chip.wicket{background:#c43d3d;color:#fff;border-color:#a02020}
@@ -60,7 +60,7 @@
 .keypad-sep{border:0;border-top:1px solid var(--line);margin:14px 0 0}
 .match-actions .mark-complete{width:auto;white-space:nowrap}.score-actions{display:flex;flex-direction:row;flex-wrap:nowrap;justify-content:space-between;align-items:center;gap:8px;width:100%;margin-top:14px}
 .score-actions .ghost{margin-bottom:0;width:auto;flex:0 0 auto}
-#recordPanel.scoring-locked .keypad{opacity:.45;pointer-events:none}
+#recordPanel.scoring-locked .keypad,#recordPanel.scoring-locked .keypad-sep,#recordPanel.scoring-locked #endInnings,#recordPanel.scoring-locked #endMatch,#recordPanel.scoring-locked [data-extra="overthrow"],#recordPanel.scoring-locked #actionMessage{display:none!important}#recordPanel.scoring-locked .score-actions{margin-top:0;justify-content:flex-start}
 .innings-label-row{margin:18px 0 8px}
 .over-team{background:#fff;border:1px solid var(--line);border-radius:16px;margin-bottom:14px;box-shadow:0 4px 20px #0030870d;overflow:hidden}
 .over-team-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;cursor:pointer;list-style:none;font-weight:800}
