@@ -24,7 +24,7 @@
     <section id="login" class="panel narrow hidden">
       <h1>Admin sign in</h1>
       <p>Sign in to create matches and record deliveries. Anyone can view scores without signing in.</p>
-      <form id="loginForm"><label>Admin password<input id="password" type="password" required autocomplete="current-password"></label><button class="primary" style="margin-top: 10px;">Sign in</button><button type="button" id="backToMatches" class="ghost" style="width:100%;margin-top:8px;margin-bottom:16px">Back to matches</button>
+      <form id="loginForm"><label>Admin password<span class="password-field"><input id="password" type="password" required autocomplete="current-password"><button type="button" id="togglePassword" class="password-toggle" aria-label="Show password" aria-pressed="false"><svg id="eyeOpen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><svg id="eyeOff" class="hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6A3 3 0 0 0 12 15a3 3 0 0 0 2.4-4.4"/><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c6.5 0 10 7 10 7a18.4 18.4 0 0 1-3.2 4.2"/><path d="M6.1 6.1C3.8 7.8 2 12 2 12s3.5 7 10 7a10.7 10.7 0 0 0 4.1-.8"/></svg></button></span></label><button class="primary" style="margin-top: 10px;">Sign in</button><button type="button" id="backToMatches" class="ghost" style="width:100%;margin-top:8px;margin-bottom:16px">Back to matches</button>
         <p id="loginError" class="error"></p>
       </form>
     </section>

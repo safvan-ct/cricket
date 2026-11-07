@@ -20,6 +20,7 @@ function applyRole(){
 }
 async function boot(){if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}try{const s=await api('status');isAdmin=!!s.authenticated}catch(e){isAdmin=false}applyRole();const id=readScoreId();if(id){try{await openMatch(id);return}catch(e){forgetMatch()}}show('app');loadMatches()}
 $('loginBtn').onclick=()=>{$('loginError').textContent='';show('login')};
+$('togglePassword').onclick=()=>{const input=$('password');const show=input.type==='password';input.type=show?'text':'password';const btn=$('togglePassword');btn.setAttribute('aria-pressed',show?'true':'false');btn.setAttribute('aria-label',show?'Hide password':'Show password');$('eyeOpen').classList.toggle('hidden',show);$('eyeOff').classList.toggle('hidden',!show)};
 $('backToMatches').onclick=()=>{forgetMatch();show('app');loadMatches()};
 $('loginForm').onsubmit=async e=>{e.preventDefault();try{await api('login','POST',{password:$('password').value});$('password').value='';isAdmin=true;applyRole();forgetMatch();show('app');loadMatches()}catch(err){$('loginError').textContent=err.message}};
 $('logout').onclick=async()=>{stopPoll();await api('logout','POST',{});isAdmin=false;current=null;applyRole();forgetMatch();show('app');loadMatches()};
