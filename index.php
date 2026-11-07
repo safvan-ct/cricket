@@ -1,3 +1,8 @@
+<?php
+$configPath = __DIR__ . '/config/config.php';
+$config = file_exists($configPath) ? require $configPath : [];
+$qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
+?>
 <!doctype html>
 <html lang="en">
 
@@ -9,18 +14,25 @@
   <link rel="apple-touch-icon" href="assets/icon-192.png">
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#002868">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Cricket">
   <link rel="stylesheet" href="assets/style.css?v=<?php echo filemtime(__DIR__ . '/assets/style.css') ?>">
 </head>
 
-<body>
+<body data-qr-url="<?php echo htmlspecialchars($qrUrl, ENT_QUOTES, 'UTF-8'); ?>">
   <header>
     <div class="brand"><span class="ball">●</span>
       <div><b>CRICKET</b><small>LIVE SCOREBOARD</small></div>
     </div>
-    <button id="loginBtn" class="ghost">Sign in</button>
-    <button id="logout" class="ghost hidden">Sign out</button>
+    <div class="header-actions">
+      <button id="qrBtn" class="ghost qr-btn" aria-label="Show QR code" title="Scan QR code">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+          <path d="M2 2h8v8H2V2zm2 2v4h4V4H4zm10-2h8v8h-8V2zm2 2v4h4V4h-4zM2 14h8v8H2v-8zm2 2v4h4v-4H4zm10 0h2v2h-2v-2zm4 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm4 0h2v2h-2v-2zm-2-2h2v2h-2v-2zm4-2h2v2h-2v-2zm0 4h2v2h-2v-2zM5 5h2v2H5V5zm12 0h2v2h-2V5zM5 17h2v2H5v-2z"/>
+        </svg>
+      </button>
+      <button id="loginBtn" class="ghost">Sign in</button>
+      <button id="logout" class="ghost hidden">Sign out</button>
+    </div>
   </header>
 
   <main>
@@ -160,6 +172,10 @@
       <button type="button" id="modalClose" class="modal-close" aria-label="Close">×</button>
       <h2 id="modalTitle">Confirm</h2>
       <p id="modalMessage"></p>
+      <div id="modalQr" class="modal-qr hidden">
+        <div id="modalQrCode" class="modal-qr-code"></div>
+        <a id="modalQrUrl" class="modal-qr-link" target="_blank" rel="noopener"></a>
+      </div>
       <div id="modalBalls" class="modal-balls hidden"></div>
       <div id="modalFields" class="modal-fields hidden">
         <p id="modalAddonLabel" class="modal-addon-label">Add-on runs</p>
@@ -180,6 +196,7 @@
     </div>
   </div>
 
+  <script src="assets/qrcode.min.js?v=<?php echo filemtime(__DIR__ . '/assets/qrcode.min.js') ?>"></script>
   <script src="assets/app.js?v=<?php echo filemtime(__DIR__ . '/assets/app.js') ?>"></script>
 </body>
 

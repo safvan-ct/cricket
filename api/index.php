@@ -37,7 +37,10 @@ if ($action === 'login') {
   $_SESSION['cricket_admin'] = true;
   respond(['ok' => true]);
 }
-if ($action === 'status') respond(['authenticated' => !empty($_SESSION['cricket_admin'])]);
+if ($action === 'status') {
+  $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
+  respond(['authenticated' => !empty($_SESSION['cricket_admin']), 'app_url' => $qrUrl]);
+}
 if ($action === 'logout') {
   $_SESSION = [];
   session_destroy();

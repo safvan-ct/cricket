@@ -7,4 +7,5 @@ return [
     'db_pass' => '',
 
     'admin_password' => '',
+    'app_url' => '',
 ];

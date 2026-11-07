@@ -102,3 +102,13 @@
 .modal-fields.overthrow-mode .modal-addon-opt:has([value="6"]){display:none}
 .modal-check{flex-direction:row;align-items:center;gap:8px;font-size:12px}
 .modal-check input{width:auto}
+.header-actions{display:flex;align-items:center;gap:8px}
+.header-actions button{margin-bottom:0}
+.qr-btn{display:grid;place-items:center;padding:9px 12px;min-width:40px;height:38px}
+.qr-btn svg{display:block}
+.modal-qr{display:flex;flex-direction:column;align-items:center;margin:14px 0 16px}
+.modal-qr.hidden{display:none!important}
+.modal-qr-code{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;box-shadow:0 4px 16px #0030870f;display:flex;justify-content:center;align-items:center;max-width:210px;width:100%}
+.modal-qr-code svg,.modal-qr-code img{width:100%;height:auto;max-width:180px;display:block}
+.modal-qr-link{margin-top:10px;font-size:12px;font-weight:700;color:var(--blue);text-decoration:none;word-break:break-all;text-align:center;padding:4px 10px;border-radius:6px;background:#eef4fb}
+.modal-qr-link:hover{text-decoration:underline;background:#e2edf8}

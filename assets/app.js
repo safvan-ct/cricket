@@ -112,6 +112,7 @@ async function boot() {
 	try {
 		const s = await api("status");
 		isAdmin = !!s.authenticated;
+		if (s && s.app_url && document.body) document.body.dataset.qrUrl = s.app_url;
 	} catch (e) {
 		isAdmin = false;
 	}
@@ -127,6 +128,18 @@ async function boot() {
 	}
 	show("app");
 	loadMatches();
+}
+if ($("qrBtn")) {
+	$("qrBtn").onclick = () => {
+		const url = getAppQrUrl();
+		showModal({
+			title: "Scan to open app",
+			message: "Scan with your phone camera to view the live scoreboard.",
+			confirmLabel: "Close",
+			showCancel: false,
+			qr: url,
+		});
+	};
 }
 $("loginBtn").onclick = () => {
 	$("loginError").textContent = "";
@@ -913,6 +926,38 @@ function modalKey(e) {
 	if (e.key === "Escape" && $("modal").dataset.allowDismiss === "1")
 		closeModal(false);
 }
+function getAppQrUrl() {
+	return (
+		(document.body && document.body.dataset && document.body.dataset.qrUrl) ||
+		(state && state.app_url) ||
+		""
+	);
+}
+function renderQrCode(container, url) {
+	if (!container) return;
+	container.innerHTML = "";
+	if (typeof qrcode === "function") {
+		try {
+			const qr = qrcode(0, "M");
+			qr.addData(url);
+			qr.make();
+			container.innerHTML = qr.createSvgTag({
+				cellSize: 6,
+				margin: 2,
+				scalable: true,
+			});
+			return;
+		} catch (e) {}
+	}
+	const img = document.createElement("img");
+	img.src =
+		"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" +
+		encodeURIComponent(url);
+	img.alt = "QR code";
+	img.width = 180;
+	img.height = 180;
+	container.append(img);
+}
 function closeModal(ok) {
 	$("modal").classList.add("hidden");
 	$("modal").setAttribute("aria-hidden", "true");
@@ -921,6 +966,12 @@ function closeModal(ok) {
 	if (ballsEl) {
 		ballsEl.innerHTML = "";
 		ballsEl.classList.add("hidden");
+	}
+	const qrEl = $("modalQr");
+	if (qrEl) {
+		qrEl.classList.add("hidden");
+		const codeEl = $("modalQrCode");
+		if (codeEl) codeEl.innerHTML = "";
 	}
 	if (modalResolve) {
 		const r = modalResolve;
@@ -936,12 +987,29 @@ function showModal({
 	fields = false,
 	balls = null,
 	overNumber = 0,
+	qr = null,
 }) {
 	$("modalTitle").textContent = title;
 	$("modalMessage").textContent = message;
 	$("modalOk").textContent = confirmLabel;
-	$("modalClose").classList.toggle("hidden", !showCancel);
+	$("modalClose").classList.toggle("hidden", !showCancel && !qr);
 	$("modalFields").classList.toggle("hidden", !fields);
+	const qrEl = $("modalQr");
+	if (qrEl) {
+		if (qr) {
+			qrEl.classList.remove("hidden");
+			renderQrCode($("modalQrCode"), qr);
+			// const linkEl = $("modalQrUrl");
+			// if (linkEl) {
+			// 	linkEl.textContent = qr;
+			// 	linkEl.href = qr;
+			// }
+		} else {
+			qrEl.classList.add("hidden");
+			const codeEl = $("modalQrCode");
+			if (codeEl) codeEl.innerHTML = "";
+		}
+	}
 	const ballsEl = $("modalBalls");
 	if (ballsEl) {
 		ballsEl.innerHTML = "";
@@ -977,7 +1045,7 @@ function showModal({
 		if (r) r.checked = true;
 		$("modalAddonLabel").textContent = ovr ? "Runs completed" : "Add-on runs";
 	}
-	$("modal").dataset.allowDismiss = showCancel ? "1" : "0";
+	$("modal").dataset.allowDismiss = showCancel || qr ? "1" : "0";
 	$("modal").classList.remove("hidden");
 	$("modal").setAttribute("aria-hidden", "false");
 	document.addEventListener("keydown", modalKey);
