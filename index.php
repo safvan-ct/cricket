@@ -88,11 +88,19 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
           <div class="team-block">
             <label>Team A name<input id="teamA" required value="PAREL"></label>
             <label>Number of players<input id="playersA" type="number" min="2" max="15" value="7" required></label>
+            <div id="rosterAWrap" class="roster-wrap">
+              <span class="subhead roster-title">Team A Players</span>
+              <div id="rosterAGrid" class="roster-grid"></div>
+            </div>
           </div>
 
           <div class="team-block">
             <label>Team B name<input id="teamB" required value="BNA"></label>
             <label>Number of players<input id="playersB" type="number" min="2" max="15" value="7" required></label>
+            <div id="rosterBWrap" class="roster-wrap">
+              <span class="subhead roster-title">Team B Players</span>
+              <div id="rosterBGrid" class="roster-grid"></div>
+            </div>
           </div>
 
           <label>Overs per innings<input id="overs" type="number" min="1" max="50" value="6" required></label>
@@ -140,6 +148,48 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
             <div class="this-over-balls" id="recent"></div>
           </div>
         </div>
+        <div class="crease-hud" id="creaseHud">
+          <div class="crease-card batters-card">
+            <div class="crease-card-head">
+              <span class="subhead">Batters</span>
+              <div class="crease-actions-group">
+                <button type="button" id="changeBattersBtn" class="change-batters-btn" title="Change active batters">Change ▾</button>
+                <button type="button" id="swapStrikeBtn" class="swap-strike-btn" title="Swap Strike">⇄ Swap strike</button>
+              </div>
+            </div>
+            <div class="batters-list">
+              <div class="crease-row active-striker" id="strikerRow">
+                <div class="batter-meta">
+                  <span class="strike-icon" title="On strike">🏏</span>
+                  <span class="player-name" id="strikerName">—</span>
+                  <span class="badge strike-badge">STRIKE</span>
+                </div>
+                <div class="player-stats" id="strikerStat">0 (0) · 4s: 0 · 6s: 0</div>
+              </div>
+              <div class="crease-row" id="nonStrikerRow">
+                <div class="batter-meta">
+                  <span class="strike-icon muted">•</span>
+                  <span class="player-name" id="nonStrikerName">—</span>
+                </div>
+                <div class="player-stats" id="nonStrikerStat">0 (0) · 4s: 0 · 6s: 0</div>
+              </div>
+            </div>
+          </div>
+          <div class="crease-card bowler-card">
+            <div class="crease-card-head">
+              <span class="subhead">Bowler</span>
+              <button type="button" id="changeBowlerBtn" class="change-bowler-btn">Change ▾</button>
+            </div>
+            <div class="crease-row bowler-row">
+              <div class="bowler-meta">
+                <span class="bowler-icon">⚾</span>
+                <span class="player-name" id="bowlerName">—</span>
+              </div>
+              <div class="player-stats" id="bowlerStat">0.0 - 0 - 0 - 0 · Econ: 0.00</div>
+            </div>
+          </div>
+        </div>
+
         <div class="panel" id="recordPanel">
           <div class="keypad">
             <button data-run="0">0</button>
@@ -169,7 +219,12 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
 
   <div id="modal" class="modal hidden" aria-hidden="true">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <button type="button" id="modalClose" class="modal-close" aria-label="Close">×</button>
+      <button type="button" id="modalClose" class="modal-close" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
       <h2 id="modalTitle">Confirm</h2>
       <p id="modalMessage"></p>
       <div id="modalQr" class="modal-qr hidden">
@@ -190,7 +245,9 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
         </div>
         <label id="modalWicketRow" class="modal-check"><input id="modalWicket" type="checkbox"> Wicket</label>
       </div>
+      <div id="modalCustom" class="modal-custom hidden"></div>
       <div class="modal-actions">
+        <button id="modalCancel" type="button" class="ghost hidden">Cancel</button>
         <button id="modalOk" class="primary">OK</button>
       </div>
     </div>

@@ -81,8 +81,9 @@
 .modal{position:fixed;inset:0;background:#001433bf;display:flex;align-items:center;justify-content:center;padding:20px;z-index:200}
 .modal.hidden{display:none!important}
 .modal-card{position:relative;background:#fff;border-radius:16px;border-top:4px solid var(--gold);padding:22px 22px 18px;max-width:400px;width:100%;box-shadow:0 16px 48px #00000050}
-.modal-close{position:absolute;top:10px;right:10px;width:32px;height:32px;padding:0;border-radius:8px;background:transparent;color:#3a5a7a;font-size:22px;line-height:1}
-.modal-close:hover{background:#eef4fb}
+.modal-close{position:absolute;top:10px;right:10px;width:32px;height:32px;padding:0;border-radius:8px;background:transparent;color:#3a5a7a;display:grid;place-items:center;cursor:pointer}
+.modal-close:hover{background:#eef4fb;color:var(--ink)}
+.modal-close svg{display:block}
 .modal-card h2{margin:0 36px 10px 0;font-size:20px;color:var(--blue)}
 .modal-card p{margin:0 0 8px;color:var(--muted);font-size:14px;line-height:1.45}
 .modal-actions{display:flex;justify-content:center;gap:8px}
@@ -112,3 +113,44 @@
 .modal-qr-code svg,.modal-qr-code img{width:100%;height:auto;max-width:180px;display:block}
 .modal-qr-link{margin-top:10px;font-size:12px;font-weight:700;color:var(--blue);text-decoration:none;word-break:break-all;text-align:center;padding:4px 10px;border-radius:6px;background:#eef4fb}
 .modal-qr-link:hover{text-decoration:underline;background:#e2edf8}
+
+/* Roster Inputs */
+.roster-wrap{grid-column:1/-1;margin-top:6px}
+.roster-title{display:block;margin:0 0 6px;color:#3a5a7a;font-size:11px;font-weight:800;letter-spacing:1px}
+.roster-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.roster-grid input{padding:8px 10px;font-size:12px;background:#fff}
+
+/* Crease HUD */
+.crease-hud{display:grid;grid-template-columns:1.2fr 1fr;gap:10px;margin-bottom:14px}
+@media(max-width:640px){.crease-hud{grid-template-columns:1fr}}
+.crease-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:0 4px 16px #0030870a}
+.crease-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.crease-card-head .subhead{margin:0;font-size:11px}
+.crease-actions-group{display:flex;align-items:center;gap:6px}
+.swap-strike-btn,.change-bowler-btn,.change-batters-btn{padding:5px 9px;font-size:11px;font-weight:700;border-radius:6px;background:#ddeaf5;color:var(--blue);border:0;cursor:pointer}
+.swap-strike-btn:hover,.change-bowler-btn:hover,.change-batters-btn:hover{background:#cde0f0}
+.batters-list{display:flex;flex-direction:column;gap:6px}
+.crease-row{display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:8px;background:#f7fbff;border:1px solid #e2edf8}
+.crease-row.active-striker{background:#eaf3fc;border-color:var(--sky)}
+.batter-meta,.bowler-meta{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700}
+.strike-icon{font-size:14px;line-height:1}
+.strike-icon.muted{opacity:.3;font-size:16px}
+.strike-badge{font-size:9px;font-weight:800;letter-spacing:.5px;padding:2px 5px;border-radius:4px;background:var(--blue);color:#fff}
+.player-name{color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}
+.player-stats{font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
+.bowler-row{margin-top:2px}
+.bowler-icon{font-size:14px;line-height:1}
+
+/* Modal Custom Content */
+.modal-custom{margin:12px 0 16px;display:flex;flex-direction:column;gap:12px}
+.modal-custom.hidden{display:none!important}
+.modal-custom-row{display:flex;flex-direction:column;gap:6px}
+.modal-custom-row label{font-size:12px;font-weight:700;color:#3a5a7a}
+.modal-custom-row select{padding:10px 12px;border-radius:8px;border:1px solid #b0ccdf;background:#fff;font-weight:600}
+.modal-select-grid{display:grid;grid-template-columns:1fr;gap:6px;max-height:200px;overflow-y:auto;padding-right:4px}
+.modal-select-btn{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:#f0f7ff;border:1px solid var(--line);font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;text-align:left}
+.modal-select-btn:hover{background:#ddeaf5;border-color:var(--sky)}
+.modal-select-btn.selected{background:var(--blue);color:#fff;border-color:var(--blue)}
+.modal-select-btn.disabled{opacity:.4;cursor:not-allowed;background:#eee}
+.modal-select-btn small{font-size:11px;font-weight:600;color:var(--muted)}
+.modal-select-btn.selected small{color:#cce0f5}

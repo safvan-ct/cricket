@@ -50,11 +50,30 @@ function requireAdmin(): void
 {
   if (empty($_SESSION['cricket_admin'])) respond(['error' => 'Admin sign-in required'], 401);
 }
+function cleanRoster(mixed $raw, int $count, string $prefix = 'Player'): array
+{
+  $list = is_array($raw) ? array_values($raw) : [];
+  $out = [];
+  for ($i = 1; $i <= $count; $i++) {
+    $idx = $i - 1;
+    $val = isset($list[$idx]) ? trim((string)$list[$idx]) : '';
+    $out[] = $val !== '' ? $val : ($prefix . ' ' . $i);
+  }
+  return $out;
+}
+function ensureRosters(array &$s): void
+{
+  $pA = max(2, (int)($s['players_a'] ?? $s['players'] ?? 7));
+  $pB = max(2, (int)($s['players_b'] ?? $s['players'] ?? 7));
+  $s['roster_a'] = cleanRoster($s['roster_a'] ?? null, $pA, 'Player');
+  $s['roster_b'] = cleanRoster($s['roster_b'] ?? null, $pB, 'Player');
+}
 function allMatches(PDO $pdo): array
 {
   $rows = $pdo->query('SELECT id,title,state_json,created_at,updated_at FROM matches ORDER BY id DESC')->fetchAll();
   foreach ($rows as &$r) {
     $s = json_decode($r['state_json'], true) ?: [];
+    ensureRosters($s);
     $r = ['id' => (int)$r['id'], 'title' => $r['title'], 'state' => $s, 'created_at' => $r['created_at'], 'updated_at' => $r['updated_at']];
   }
   return $rows;
@@ -70,7 +89,25 @@ if ($action === 'create') {
   $overs = max(1, min(50, (int)($b['overs'] ?? 6)));
   $bat = ($b['batting_first'] ?? 'A') === 'B' ? 'B' : 'A';
   if ($a === '' || $c === '') respond(['error' => 'Enter both team names'], 422);
-  $state = ['team_a' => $a, 'team_b' => $c, 'players_a' => $playersA, 'players_b' => $playersB, 'players' => max($playersA, $playersB), 'overs_limit' => $overs, 'batting_first' => $bat, 'innings' => 1, 'status' => 'live', 'deliveries' => [], 'created' => date('c')];
+  $rosterA = cleanRoster($b['roster_a'] ?? null, $playersA, 'Player');
+  $rosterB = cleanRoster($b['roster_b'] ?? null, $playersB, 'Player');
+  $state = [
+    'team_a' => $a,
+    'team_b' => $c,
+    'players_a' => $playersA,
+    'players_b' => $playersB,
+    'players' => max($playersA, $playersB),
+    'roster_a' => $rosterA,
+    'roster_b' => $rosterB,
+    'overs_limit' => $overs,
+    'batting_first' => $bat,
+    'innings' => 1,
+    'status' => 'live',
+    'deliveries' => [],
+    'crease' => null,
+    'openers' => null,
+    'created' => date('c')
+  ];
   $st = $pdo->prepare('INSERT INTO matches(title,state_json) VALUES(?,?)');
   $st->execute([$a . ' vs ' . $c, json_encode($state)]);
   respond(['id' => (int)$pdo->lastInsertId(), 'state' => $state], 201);
@@ -105,7 +142,16 @@ function inningsStats(array $deliveries): array
 }
 function snapshotInnings(array $s, array $stats): array
 {
-  return ['team' => teamName($s, battingSide($s)), 'side' => battingSide($s), 'deliveries' => $s['deliveries'] ?? [], 'total' => $stats['total'], 'wickets' => $stats['w'], 'legal' => $stats['legal']];
+  return [
+    'team' => teamName($s, battingSide($s)),
+    'side' => battingSide($s),
+    'deliveries' => $s['deliveries'] ?? [],
+    'total' => $stats['total'],
+    'wickets' => $stats['w'],
+    'legal' => $stats['legal'],
+    'crease' => $s['crease'] ?? null,
+    'openers' => $s['openers'] ?? null
+  ];
 }
 function closeFirstInnings(array &$s): void
 {
@@ -114,6 +160,8 @@ function closeFirstInnings(array &$s): void
   $s['target'] = $stats['total'] + 1;
   $s['innings'] = 2;
   $s['deliveries'] = [];
+  $s['crease'] = null;
+  $s['openers'] = null;
   $s['status'] = 'live';
   unset($s['innings_2'], $s['result']);
 }
@@ -160,9 +208,8 @@ function inningsShouldClose(array $s): bool
 {
   $stats = inningsStats($s['deliveries'] ?? []);
   $oversDone = $stats['legal'] >= ((int)$s['overs_limit']) * 6;
-  $allOut = $stats['w'] >= battingPlayers($s);
   $chased = ((int)($s['innings'] ?? 1) === 2) && isset($s['target']) && $stats['total'] >= (int)$s['target'];
-  return $oversDone || $allOut || $chased;
+  return $oversDone || $chased;
 }
 function applyAutoClose(array &$s): void
 {
@@ -194,13 +241,16 @@ if ($action === 'get') {
   $st->execute([$id]);
   $r = $st->fetch();
   if (!$r) respond(['error' => 'Match not found'], 404);
-  respond(['id' => (int)$r['id'], 'title' => $r['title'], 'state' => json_decode($r['state_json'], true)]);
+  $s = json_decode($r['state_json'], true) ?: [];
+  ensureRosters($s);
+  respond(['id' => (int)$r['id'], 'title' => $r['title'], 'state' => $s]);
 }
 if ($action === 'update') {
   requireAdmin();
   $b = body();
   $pdo->beginTransaction();
   $s = loadMatchForUpdate($pdo, $id);
+  ensureRosters($s);
   if (($s['status'] ?? '') === 'complete') {
     $pdo->rollBack();
     respond(['error' => 'Match is complete'], 422);
@@ -250,6 +300,8 @@ if ($action === 'update') {
   $s['players_a'] = $playersA;
   $s['players_b'] = $playersB;
   $s['players'] = max($playersA, $playersB);
+  $s['roster_a'] = cleanRoster($b['roster_a'] ?? ($s['roster_a'] ?? null), $playersA, 'Player');
+  $s['roster_b'] = cleanRoster($b['roster_b'] ?? ($s['roster_b'] ?? null), $playersB, 'Player');
   $s['overs_limit'] = $overs;
   if (!$started) $s['batting_first'] = (($b['batting_first'] ?? 'A') === 'B') ? 'B' : 'A';
   foreach (['innings_1', 'innings_2'] as $k) {
@@ -262,17 +314,45 @@ if ($action === 'update') {
   $pdo->commit();
   respond(['ok' => true, 'title' => $title, 'state' => $s]);
 }
+if ($action === 'set_crease') {
+  requireAdmin();
+  $b = body();
+  $pdo->beginTransaction();
+  $s = loadMatchForUpdate($pdo, $id);
+  ensureRosters($s);
+  if (($s['status'] ?? '') === 'complete') {
+    $pdo->rollBack();
+    respond(['error' => 'Match is complete'], 422);
+  }
+  $crease = [
+    'striker' => trim((string)($b['striker'] ?? '')),
+    'non_striker' => trim((string)($b['non_striker'] ?? '')),
+    'bowler' => trim((string)($b['bowler'] ?? ''))
+  ];
+  $s['crease'] = $crease;
+  if (!empty($b['set_as_openers']) || empty($s['openers'])) {
+    $s['openers'] = $crease;
+  }
+  saveMatch($pdo, $id, $s);
+  $pdo->commit();
+  respond(['ok' => true, 'state' => $s]);
+}
 if ($action === 'delivery') {
   requireAdmin();
   $b = body();
   $pdo->beginTransaction();
   $s = loadMatchForUpdate($pdo, $id);
+  ensureRosters($s);
   if (($s['status'] ?? '') === 'complete') {
     $pdo->rollBack();
     respond(['error' => 'Match is complete'], 422);
   }
   $d = $b['delivery'] ?? [];
-  $allowed = ['runs', 'extra_type', 'extra_runs', 'wicket', 'dismissal', 'dismissed_player', 'batter', 'bowler'];
+  $allowed = [
+    'runs', 'extra_type', 'extra_runs', 'wicket', 'dismissal',
+    'dismissed_player', 'batter', 'bowler', 'striker', 'non_striker',
+    'next_batter', 'strike_rotated', 'crease_before', 'crease_after'
+  ];
   $item = [];
   foreach ($allowed as $k) {
     $item[$k] = $d[$k] ?? null;
@@ -287,6 +367,14 @@ if ($action === 'delivery') {
     respond(['error' => 'Invalid extra type'], 422);
   }
   $s['deliveries'][] = $item;
+  if (!empty($b['crease']) && is_array($b['crease'])) {
+    $s['crease'] = $b['crease'];
+  } elseif (!empty($item['crease_after']) && is_array($item['crease_after'])) {
+    $s['crease'] = $item['crease_after'];
+  }
+  if (!empty($b['openers']) && is_array($b['openers'])) {
+    $s['openers'] = $b['openers'];
+  }
   applyAutoClose($s);
   saveMatch($pdo, $id, $s);
   $pdo->commit();
@@ -296,6 +384,7 @@ if ($action === 'end_innings') {
   requireAdmin();
   $pdo->beginTransaction();
   $s = loadMatchForUpdate($pdo, $id);
+  ensureRosters($s);
   if (($s['status'] ?? '') !== 'live' || (int)($s['innings'] ?? 1) !== 1) {
     $pdo->rollBack();
     respond(['error' => 'Can only end the first innings while it is live'], 422);
@@ -309,6 +398,7 @@ if ($action === 'end_match') {
   requireAdmin();
   $pdo->beginTransaction();
   $s = loadMatchForUpdate($pdo, $id);
+  ensureRosters($s);
   if (($s['status'] ?? '') !== 'live' || (int)($s['innings'] ?? 1) !== 2) {
     $pdo->rollBack();
     respond(['error' => 'Can only end the match during the second innings'], 422);
@@ -322,6 +412,7 @@ if ($action === 'mark_complete') {
   requireAdmin();
   $pdo->beginTransaction();
   $s = loadMatchForUpdate($pdo, $id);
+  ensureRosters($s);
   if (!empty($s['locked'])) {
     $pdo->rollBack();
     respond(['error' => 'Match is marked completed'], 422);
@@ -335,6 +426,7 @@ if ($action === 'undo') {
   requireAdmin();
   $pdo->beginTransaction();
   $s = loadMatchForUpdate($pdo, $id);
+  ensureRosters($s);
   if (!empty($s['locked'])) {
     $pdo->rollBack();
     respond(['error' => 'Match is marked completed'], 422);
@@ -344,6 +436,8 @@ if ($action === 'undo') {
     unset($s['result'], $s['innings_2']);
   } elseif ((int)($s['innings'] ?? 1) === 2 && empty($s['deliveries']) && !empty($s['innings_1'])) {
     $s['deliveries'] = $s['innings_1']['deliveries'] ?? [];
+    $s['crease'] = $s['innings_1']['crease'] ?? null;
+    $s['openers'] = $s['innings_1']['openers'] ?? null;
     $s['innings'] = 1;
     $s['status'] = 'live';
     unset($s['target'], $s['innings_1'], $s['result'], $s['innings_2']);
@@ -352,7 +446,13 @@ if ($action === 'undo') {
       $pdo->rollBack();
       respond(['error' => 'Nothing to undo'], 422);
     }
-    array_pop($s['deliveries']);
+    $popped = array_pop($s['deliveries']);
+    if (!empty($s['deliveries'])) {
+      $last = end($s['deliveries']);
+      $s['crease'] = $last['crease_after'] ?? ($popped['crease_before'] ?? ($s['openers'] ?? null));
+    } else {
+      $s['crease'] = $popped['crease_before'] ?? ($s['openers'] ?? null);
+    }
   }
   saveMatch($pdo, $id, $s);
   $pdo->commit();
