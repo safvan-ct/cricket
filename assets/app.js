@@ -18,7 +18,7 @@ function applyRole(){
   $('loginBtn').classList.toggle('hidden',isAdmin);
   $('recordPanel').classList.toggle('hidden',!isAdmin);
 }
-async function boot(){if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}try{const s=await api('status');isAdmin=!!s.authenticated}catch(e){isAdmin=false}applyRole();const id=readScoreId();if(id){try{await openMatch(id);return}catch(e){forgetMatch()}}show('app');loadMatches()}
+async function boot(){if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).catch(()=>{})}try{const s=await api('status');isAdmin=!!s.authenticated}catch(e){isAdmin=false}applyRole();const id=readScoreId();if(id){try{await openMatch(id);return}catch(e){forgetMatch()}}show('app');loadMatches()}
 $('loginBtn').onclick=()=>{$('loginError').textContent='';show('login')};
 $('togglePassword').onclick=()=>{const input=$('password');const show=input.type==='password';input.type=show?'text':'password';const btn=$('togglePassword');btn.setAttribute('aria-pressed',show?'true':'false');btn.setAttribute('aria-label',show?'Hide password':'Show password');$('eyeOpen').classList.toggle('hidden',show);$('eyeOff').classList.toggle('hidden',!show)};
 $('backToMatches').onclick=()=>{forgetMatch();show('app');loadMatches()};

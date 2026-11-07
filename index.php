@@ -11,7 +11,7 @@
   <meta name="theme-color" content="#002868">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Scoreboard">
-  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="assets/style.css?v=<?= filemtime(__DIR__.'/assets/style.css') ?>">
 </head>
 
 <body>
@@ -146,7 +146,7 @@
       </div>
     </div>
   </div>
-  <script src="assets/app.js"></script>
+  <script src="assets/app.js?v=<?= filemtime(__DIR__.'/assets/app.js') ?>"></script>
 </body>
 
 </html>
