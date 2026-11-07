@@ -182,12 +182,12 @@ function renderOverCards(){
   const el=$('overCards');if(!el)return;
   el.innerHTML='';
   const current=state.deliveries||[];
-  if(!state.innings_1&&!current.length){el.innerHTML='<p class="hint">No deliveries yet. Ball notes will appear here over by over.</p>';return}
+  if(!state.innings_1&&!current.length){el.innerHTML='';return}
   const c=calc();
   const batting=battingTeamName();
   const currentScore=c.total+'/'+c.w+' ('+oversText(c.legal)+')';
   const liveKey=state.innings===2?'innings-2':'innings-1';
-  appendOverSection(el,liveKey,batting,currentScore,current,!isComplete(),true);
+  appendOverSection(el,liveKey,batting,currentScore,current,!isComplete(),false);
   if(state.innings_1){
     const i1=state.innings_1;
     appendOverSection(el,'innings-1',i1.team,i1.total+'/'+i1.wickets+' ('+oversText(i1.legal)+')',i1.deliveries||[],false,false);
@@ -217,9 +217,6 @@ function setPendingExtra(type){
   syncPendingButtons();
 }
 function render(){const c=calc();const team=battingTeamName();
-$('battingTeam').textContent=team;$('total').textContent=c.total;$('wickets').textContent=c.w;$('overText').textContent=oversText(c.legal);$('rr').textContent=c.legal?(c.total/(c.legal/6)).toFixed(2):'0.00';$('extras').textContent=c.extraRuns;$('legalBalls').textContent=c.legal;$('oversLeft').textContent=Math.max(0,state.overs_limit-c.legal/6).toFixed(1);
-$('battingRows').innerHTML='';for(let i=1;i<=state.players;i++){const x=c.batBalls[i]||{r:0,b:0,f:0,s:0};const tr=document.createElement('tr');tr.innerHTML=`<td>Player ${i}</td><td>${x.r}</td><td>${x.b}</td><td>${x.f}</td><td>${x.s}</td><td>${x.b?(x.r/x.b*100).toFixed(1):'0.0'}</td>`;$('battingRows').append(tr)}
-$('bowlingRows').innerHTML='';Object.keys(c.bowl).sort((a,b)=>a-b).forEach(i=>{const x=c.bowl[i];const tr=document.createElement('tr');tr.innerHTML=`<td>Player ${i}</td><td>${oversText(x.b)}</td><td>${x.r}</td><td>${x.w}</td><td>${x.b?(x.r/(x.b/6)).toFixed(2):'0.00'}</td>`;$('bowlingRows').append(tr)});
 $('sbTeam').textContent=team;$('sbTotal').textContent=c.total;$('sbWickets').textContent=c.w;$('sbOvers').textContent=oversText(c.legal);
 const rr=c.legal?(c.total/(c.legal/6)).toFixed(2):'0.00';$('sbRR').textContent=rr;
 const needBlock=$('sbNeedBlock');const resultEl=$('sbResult');
@@ -234,6 +231,8 @@ $('recordPanel').classList.toggle('scoring-locked',isComplete());
 if(isComplete()){$('actionMessage').textContent=state.result&&state.result.text?state.result.text:'Match complete.'}
 const overs=groupOvers(state.deliveries||[]);
 const stickyOver=overs.length?overs[overs.length-1].balls:[];
+const overRunCount=overRuns(stickyOver);
+$('thisOverRuns').textContent=overRunCount===1?'1 run':overRunCount+' runs';
 renderOverChips($('recent'),stickyOver);
 renderOverCards();}
 let modalResolve=null;

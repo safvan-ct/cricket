@@ -14,14 +14,8 @@
 .match-day-name{font-size:13px;letter-spacing:.3px}
 .match-day-count{font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap}
 .match-day-body{display:grid;gap:8px;padding:0 12px 12px}
-/* Score panel */
-.score-panel{background:linear-gradient(135deg,#002868 0%,#003da5 100%);color:#fff;border-radius:16px;padding:23px;margin:10px 0 18px}.innings-label{color:var(--gold)}.score-line{margin-top:14px}.score-line h2{color:#a8c8e8;margin:0 0 4px;font-size:14px}.score{font:800 58px 'Barlow Condensed';line-height:1}.overs{color:#90b8d8;font-size:12px;margin-top:7px}.sep{padding:0 8px}.live-tag{font-size:10px;letter-spacing:1px;color:var(--gold);border:1px solid #4a6898;padding:7px 10px;border-radius:30px}.live-tag i{display:inline-block;width:6px;height:6px;background:var(--gold);border-radius:50%;margin-right:5px}
-/* Mini stats */
-.mini-stats{display:flex;gap:36px;border-top:1px solid #2a4878;margin-top:20px;padding-top:15px}.mini-stats small,.mini-stats b{display:block}.mini-stats small{font-size:9px;color:#90b8d8;letter-spacing:1px}.mini-stats b{font-size:16px;margin-top:4px}
 /* Controls */
-.controls{display:grid;grid-template-columns:1fr 1fr;gap:12px}.subhead{font-size:10px;font-weight:800;color:var(--muted);letter-spacing:1.3px;margin:20px 0 9px}
-/* Run & extra buttons */
-.run-buttons,.extra-buttons{display:flex;gap:4px;flex-wrap:wrap}.run-buttons button{width:45px;height:41px;background:#ddeaf5;color:#002868;font-size:14px;font-weight:700}.run-buttons button:hover{background:#c5daf0}.run-buttons .boundary{background:var(--gold);color:#002868}.run-buttons .boundary:hover{background:#e6b220}.extra-buttons button{background:#eef4fb;color:#2a5080;font-weight:600}.extra-buttons button:hover{background:#ddeaf5}.extra-buttons button.selected{background:var(--blue);color:#fff}.extra-buttons .wicket-btn{background:var(--red);color:#fff}.extra-buttons .wicket-btn:hover{background:#a82e2e;color:#fff}.extra-buttons .wicket-btn.selected{background:#7a1a1a;color:#fff;box-shadow:0 0 0 2px var(--gold)}
+.subhead{font-size:10px;font-weight:800;color:var(--muted);letter-spacing:1.3px;margin:20px 0 9px}
 /* Wicket row */
 .hint{font-size:11px;color:var(--muted);margin:12px 0 0}
 /* Scorecard tables */
@@ -34,28 +28,38 @@
 .toss-block{margin-top:4px}.toss-options{display:flex;gap:12px;margin-top:8px}.toss-radio{display:flex;cursor:pointer;flex:1}.toss-radio input[type=radio]{display:none}.toss-pill{flex:1;text-align:center;padding:13px 10px;border-radius:11px;border:2px solid var(--line);background:#f0f7ff;color:var(--muted);font-weight:700;font-size:13px;transition:all .15s;user-select:none}.toss-radio input[type=radio]:checked+.toss-pill{background:var(--blue);color:#fff;border-color:var(--blue)}.toss-radio:hover .toss-pill{border-color:var(--sky)}
 /* Responsive */
 @media(max-width:480px){.team-block{grid-template-columns:1fr}}
-@media(max-width:600px){main{margin:22px auto}.panel{padding:17px}.topline h1{font-size:24px}.mini-stats{gap:20px}.match-card{align-items:flex-start;flex-direction:column}.match-actions{width:100%}.match-actions button{flex:1}}
-/* Score view layout */
-#scoreView{display:flex;flex-direction:column}
-.score-scroll{flex:1;padding-bottom:130px}
-/* Sticky scoreboard — compact 3-line */
-.score-sticky{position:fixed;bottom:0;left:0;right:0;width:100%;background:#002868;border-top:3px solid var(--gold);box-shadow:0 -4px 24px #00000040;z-index:100}
-.sticky-inner{padding:10px 16px;display:flex;flex-direction:column;gap:4px}
-.score-scroll{flex:1;overflow-y:auto;padding-bottom:120px}
-/* Line 1: TEAM  42/3  (3.4)          RR 11.45 */
-.sb-line1{display:flex;align-items:baseline;gap:6px;line-height:1;justify-content:space-between}
-.sb-team-name{font-size:11px;font-weight:800;letter-spacing:1.5px;color:var(--gold);text-transform:uppercase;margin-right:4px}
-.sb-runs{font:800 28px 'Barlow Condensed';color:#fff;line-height:1}
-.sb-slash{font:800 22px 'Barlow Condensed';color:#4a6898;margin:0 1px}
-.sb-ov{font-size:13px;font-weight:600;color:#90b8d8;margin-left:4px;flex:1}
-.sb-rr-inline{font-size:13px;color:#90b8d8;white-space:nowrap;margin-left:auto}.sb-rr-inline strong{color:#fff}
-/* Line 2: Need 48 from 32 balls · RRR 9.00  (2nd innings only) */
-.sb-line2{font-size:12px;color:#90b8d8;display:flex;align-items:center;flex-wrap:wrap;gap:4px;min-height:0}
-.sb-line2:empty,.sb-line2 .hidden:only-child{display:none}
+@media(max-width:600px){main{margin:22px auto}.panel{padding:17px}.topline h1{font-size:24px}.match-card{align-items:flex-start;flex-direction:column}.match-actions{width:100%}.match-actions button{flex:1}.sb-runs{font-size:44px}}
+/* Score hero */
+.score-hero{background:#002868;color:#fff;border-radius:16px;border-top:3px solid var(--gold);padding:16px 16px 14px;margin-bottom:14px;box-shadow:0 8px 24px #00308733}
+.sb-line1{display:flex;align-items:baseline;gap:6px;line-height:1;flex-wrap:wrap}
+.sb-team-name{font-size:12px;font-weight:800;letter-spacing:1.5px;color:var(--gold);text-transform:uppercase;width:100%}
+.sb-runs{font:800 56px 'Barlow Condensed';color:#fff;line-height:.9}
+.sb-slash{font:800 40px 'Barlow Condensed';color:#4a6898;margin:0 1px}
+.sb-ov{font-size:16px;font-weight:600;color:#90b8d8;margin-left:4px;flex:1}
+.sb-rr-inline{font-size:14px;color:#90b8d8;white-space:nowrap;margin-left:auto}.sb-rr-inline strong{color:#fff}
+.sb-line2{font-size:13px;color:#90b8d8;display:flex;align-items:center;flex-wrap:wrap;gap:4px;min-height:0;margin-top:6px}
+.sb-line2:not(:has(:not(.hidden))){display:none}
 .sb-line2 strong{color:#fff}
 .sb-result{color:var(--gold);font-weight:800}
-.score-actions{display:flex;flex-wrap:wrap;gap:4px}
-#recordPanel.scoring-locked .run-buttons,#recordPanel.scoring-locked .extra-buttons{opacity:.45;pointer-events:none}
+.this-over{margin-top:12px;padding-top:10px;border-top:1px solid #2a4878}
+.this-over-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px}
+.this-over-head .subhead{margin:0;color:#90b8d8}
+#thisOverRuns{font-size:12px;font-weight:700;color:#fff}
+.this-over-balls{display:flex;gap:6px;flex-wrap:wrap;min-height:28px}
+.this-over-balls .ball-chip{background:#1a3a6a;color:#c8dff0;border:1px solid #2a4878}
+.this-over-balls .ball-chip.boundary{background:var(--gold);color:#002868;border-color:var(--gold)}
+.this-over-balls .ball-chip.wicket{background:#c43d3d;color:#fff;border-color:#a02020}
+.this-over-balls .ball-chip.extra{background:#2a5a8a;color:#d4eefc;border-color:#3a6a9a}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.keypad button{height:58px;padding:0;font-size:18px;background:#ddeaf5;color:#002868}
+.keypad button:hover{background:#c5daf0}
+.keypad .boundary{background:var(--gold);color:#002868}
+.keypad .boundary:hover{background:#e6b220}
+.keypad .wicket-btn{background:var(--red);color:#fff}
+.keypad .wicket-btn:hover{background:#a82e2e}
+.score-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.score-actions .ghost{margin-bottom:0}
+#recordPanel.scoring-locked .keypad{opacity:.45;pointer-events:none}
 .innings-label-row{margin:18px 0 8px}
 .over-team{background:#fff;border:1px solid var(--line);border-radius:16px;margin-bottom:14px;box-shadow:0 4px 20px #0030870d;overflow:hidden}
 .over-team-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;cursor:pointer;list-style:none;font-weight:800}
@@ -66,12 +70,6 @@
 .over-team-score{font:800 18px 'Barlow Condensed';color:var(--blue);white-space:nowrap}
 .over-team-body{padding:0 12px 12px}
 .over-team-body .over-card{box-shadow:none}
-/* Line 3: ball chips — no label */
-.sb-line3{display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}
-.sb-line3 .ball-chip{width:auto;min-width:28px;height:28px;padding:0 7px;border-radius:14px;background:#1a3a6a;color:#c8dff0;border:1px solid #2a4878;font-size:10px;font-weight:800;display:grid;place-items:center;flex-shrink:0}
-.sb-line3 .ball-chip.boundary{background:var(--gold);color:#002868;border-color:var(--gold)}
-.sb-line3 .ball-chip.wicket{background:#c43d3d;color:#fff;border-color:#a02020}
-.sb-line3 .ball-chip.extra{background:#2a5a8a;color:#d4eefc;border-color:#3a6a9a}
 /* Over-by-over cards */
 .over-card{background:#f7fbff;border:1px solid var(--line);border-radius:12px;padding:14px 14px;margin-bottom:8px;box-shadow:0 4px 20px #0030870d}
 .over-card.current{border-color:var(--sky)}
@@ -79,7 +77,6 @@
 .over-card-head h3{margin:0;font-size:14px;letter-spacing:.4px}
 .over-card-head span{font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap}
 .over-card-balls{display:flex;gap:6px;flex-wrap:wrap}
-@media(max-width:600px){.sticky-inner{padding:10px 14px}.sb-runs{font-size:24px}}
 .modal{position:fixed;inset:0;background:#001433bf;display:flex;align-items:center;justify-content:center;padding:20px;z-index:200}
 .modal.hidden{display:none!important}
 .modal-card{background:#fff;border-radius:16px;border-top:4px solid var(--gold);padding:22px 22px 18px;max-width:400px;width:100%;box-shadow:0 16px 48px #00000050}

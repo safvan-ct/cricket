@@ -78,60 +78,48 @@
         </form>
       </div>
       <div id="scoreView" class="hidden">
-        <div class="score-scroll">
-          <div class="section-head"><button id="back" class="ghost">← Matches</button><span id="matchTitle" class="eyebrow"></span></div>
-          <div class="panel" id="recordPanel">
-            <div class="section-head">
-              <h2>OVER</h2>
-              <div class="score-actions"><button id="undo" class="ghost">↶ Undo</button><button id="endInnings" class="ghost">End innings</button><button id="endMatch" class="ghost hidden">End match</button></div>
-            </div>
-            <p class="subhead">Runs off the bat</p>
-            <div class="run-buttons">
-              <button data-run="0">0</button>
-              <button data-run="1">1</button>
-              <button data-run="2">2</button>
-              <button data-run="3">3</button>
-              <button data-run="4" class="boundary">4</button>
-              <button data-run="6" class="boundary">6</button>
-            </div>
-            <p class="subhead">Extras</p>
-            <div class="extra-buttons">
-              <button data-extra="wide">Wide</button>
-              <button data-extra="no-ball">No-ball</button>
-              <!-- <button data-extra="bye">Bye</button> -->
-              <button data-extra="overthrow">Ovr 4</button>
-              <button data-extra="wicket" class="wicket-btn">Wicket</button>
-            </div>
-            <p id="actionMessage" class="hint">Tap a run, or an extra / wicket to add on runs.</p>
+        <div class="section-head"><button id="back" class="ghost">← Matches</button><span id="matchTitle" class="eyebrow"></span></div>
+        <div class="score-hero">
+          <div class="sb-line1">
+            <span id="sbTeam" class="sb-team-name"></span>
+            <span id="sbTotal" class="sb-runs">0</span><span class="sb-slash">/</span><span id="sbWickets" class="sb-runs">0</span>
+            <span class="sb-ov">(<span id="sbOvers">0.0</span>)</span>
+            <span class="sb-rr-inline">RR <strong id="sbRR">0.00</strong></span>
           </div>
-          <div id="overCards"></div>
+          <div class="sb-line2">
+            <span id="sbNeedBlock" class="hidden">Need <strong id="sbNeed">—</strong> from <strong id="sbNeedBalls">—</strong> balls · RRR <strong id="sbRRR">—</strong></span>
+            <span id="sbResult" class="sb-result hidden"></span>
+          </div>
+          <div class="this-over">
+            <div class="this-over-head">
+              <span class="subhead">This over</span>
+              <span id="thisOverRuns">0 runs</span>
+            </div>
+            <div class="this-over-balls" id="recent"></div>
+          </div>
         </div>
-        <!-- hidden elements for JS compatibility -->
+        <div class="panel" id="recordPanel">
+          <div class="keypad">
+            <button data-run="0">0</button>
+            <button data-run="1">1</button>
+            <button data-run="2">2</button>
+            <button data-run="3">3</button>
+            <button data-run="4" class="boundary">4</button>
+            <button data-run="6" class="boundary">6</button>
+            <button data-extra="wide">Wide</button>
+            <button data-extra="no-ball">No-ball</button>
+            <button data-extra="wicket" class="wicket-btn">Wicket</button>
+          </div>
+          <div class="score-actions">
+            <button id="undo" class="ghost">↶ Undo</button>
+            <button id="endInnings" class="ghost">End innings</button>
+            <button id="endMatch" class="ghost hidden">End match</button>
+            <button data-extra="overthrow" class="ghost">Ovr 4</button>
+          </div>
+          <p id="actionMessage" class="hint">Tap a run, or an extra / wicket to add on runs.</p>
+        </div>
+        <div id="overCards"></div>
         <input type="hidden" id="batter" value="1"><input type="hidden" id="bowler" value="1">
-        <span hidden id="battingTeam"></span><span hidden id="total"></span><span hidden id="wickets"></span><span hidden id="overText"></span><span hidden id="rr"></span><span hidden id="extras"></span><span hidden id="legalBalls"></span><span hidden id="oversLeft"></span>
-        <!-- hidden stat holders used by JS render() -->
-        <table hidden>
-          <tbody id="battingRows"></tbody>
-        </table>
-        <table hidden>
-          <tbody id="bowlingRows"></tbody>
-        </table>
-
-        <div class="score-sticky">
-          <div class="sticky-inner">
-            <div class="sb-line1">
-              <span id="sbTeam" class="sb-team-name"></span>
-              <span id="sbTotal" class="sb-runs">0</span><span class="sb-slash">/</span><span id="sbWickets" class="sb-runs">0</span>
-              <span class="sb-ov">(<span id="sbOvers">0.0</span>)</span>
-              <span class="sb-rr-inline">RR <strong id="sbRR">0.00</strong></span>
-            </div>
-            <div class="sb-line2">
-              <span id="sbNeedBlock" class="hidden">Need <strong id="sbNeed">—</strong> from <strong id="sbNeedBalls">—</strong> balls · RRR <strong id="sbRRR">—</strong></span>
-              <span id="sbResult" class="sb-result hidden"></span>
-            </div>
-            <div class="sb-line3" id="recent"></div>
-          </div>
-        </div>
       </div>
     </section>
   </main>
