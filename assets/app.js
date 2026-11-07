@@ -65,10 +65,26 @@ function startViewerPoll() {
 			const prev = state;
 			const r = await api("get", "GET", null, current);
 			const closed = overJustClosed(prev, r.state);
+			const inningsChanged =
+				prev && prev.innings === 1 && r.state && r.state.innings === 2;
 			state = r.state;
 			render();
-			if (closed)
+			if (inningsChanged) {
+				const beforeLegal = legalCount(prev);
+				const afterLegal = r.state.innings_1 ? r.state.innings_1.legal : 0;
+				const endedOverNum =
+					Math.floor(afterLegal / 6) > Math.floor(beforeLegal / 6)
+						? Math.floor(afterLegal / 6)
+						: 0;
+				const overBalls = endedOverNum
+					? endedOverBalls(endedOverNum, r.state)
+					: null;
+				await notifyPhaseChange(
+					endedOverNum ? { balls: overBalls, overNumber: endedOverNum } : null,
+				);
+			} else if (closed) {
 				await notifyOverComplete(closed, endedOverBalls(closed, r.state));
+			}
 		} catch (e) {}
 	}, 4000);
 }
@@ -979,7 +995,11 @@ function showError(message) {
 }
 function endedOverBalls(n, customState = null) {
 	const s = customState || state;
-	const overs = groupOvers((s && s.deliveries) || []);
+	const deliveries =
+		s && s.deliveries && s.deliveries.length
+			? s.deliveries
+			: (s && s.innings_1 && s.innings_1.deliveries) || [];
+	const overs = groupOvers(deliveries);
 	return (overs[n - 1] && overs[n - 1].balls) || [];
 }
 async function notifyOverComplete(n, balls = null) {
@@ -995,7 +1015,7 @@ async function notifyOverComplete(n, balls = null) {
 		overNumber: n,
 	});
 }
-async function notifyPhaseChange() {
+async function notifyPhaseChange(overDetails = null) {
 	if (isComplete() && state.result && state.result.text) {
 		await showModal({
 			title: "Match complete",
@@ -1019,6 +1039,8 @@ async function notifyPhaseChange() {
 			message: "2nd innings. Target " + state.target + ".",
 			confirmLabel: "Start 2nd innings",
 			showCancel: false,
+			balls: overDetails ? overDetails.balls : null,
+			overNumber: overDetails ? overDetails.overNumber : 0,
 		});
 }
 async function addDelivery(
@@ -1052,8 +1074,20 @@ async function addDelivery(
 		syncPendingButtons();
 		render();
 		if (isComplete() && prevStatus !== "complete") await notifyPhaseChange();
-		else if (state.innings === 2 && prevInnings === 1)
-			await notifyPhaseChange();
+		else if (state.innings === 2 && prevInnings === 1) {
+			const beforeLegal = legalCount(prev);
+			const afterLegal = r.state.innings_1 ? r.state.innings_1.legal : 0;
+			const endedOverNum =
+				Math.floor(afterLegal / 6) > Math.floor(beforeLegal / 6)
+					? Math.floor(afterLegal / 6)
+					: 0;
+			const overBalls = endedOverNum
+				? endedOverBalls(endedOverNum, r.state)
+				: null;
+			await notifyPhaseChange(
+				endedOverNum ? { balls: overBalls, overNumber: endedOverNum } : null,
+			);
+		}
 		else if (closed)
 			await notifyOverComplete(closed, endedOverBalls(closed, r.state));
 		else $("actionMessage").textContent = "Delivery recorded.";
