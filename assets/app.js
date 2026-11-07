@@ -6,7 +6,7 @@ function readScoreId(){const m=String(location.hash||'').match(/^#m=(\d+)$/);ret
 function rememberMatch(id){const next='#m='+id;if(location.hash!==next)history.replaceState(null,'',location.pathname+location.search+next)}
 function forgetMatch(){if(location.hash)history.replaceState(null,'',location.pathname+location.search)}
 function stopPoll(){if(pollTimer){clearInterval(pollTimer);pollTimer=null}}
-function startViewerPoll(){stopPoll();if(isAdmin||!current)return;pollTimer=setInterval(async()=>{if(!current||isAdmin)return;try{const r=await api('get','GET',null,current);state=r.state;render()}catch(e){}},4000)}
+function startViewerPoll(){stopPoll();if(isAdmin||!current)return;pollTimer=setInterval(async()=>{if(!current||isAdmin||!$('modal').classList.contains('hidden'))return;try{const prev=state;const r=await api('get','GET',null,current);const closed=overJustClosed(prev,r.state);state=r.state;render();if(closed)await notifyOverComplete(closed)}catch(e){}},4000)}
 function scoringOpen(){return !$('scoreView').classList.contains('hidden')||editingMatch}
 function headerMode(){
   $('newMatch').classList.toggle('hidden',!isAdmin||scoringOpen());
@@ -94,6 +94,9 @@ function battingSide(){const first=state.batting_first==='B'?'B':'A';return stat
 function battingTeamName(){return battingSide()==='B'?state.team_b:state.team_a}
 function isComplete(){return state.status==='complete'}
 function isLegalBall(d){return !['wide','no-ball'].includes(d.extra_type||'')}
+function legalCount(s){return ((s&&s.deliveries)||[]).filter(isLegalBall).length}
+function overWord(n){const words=['','First','Second','Third','Fourth','Fifth','Sixth','Seventh','Eighth','Ninth','Tenth','Eleventh','Twelfth','Thirteenth','Fourteenth','Fifteenth','Sixteenth','Seventeenth','Eighteenth','Nineteenth','Twentieth'];if(n>0&&n<words.length)return words[n];const mod10=n%10,mod100=n%100;const suf=mod10===1&&mod100!==11?'st':mod10===2&&mod100!==12?'nd':mod10===3&&mod100!==13?'rd':'th';return n+suf}
+function overJustClosed(prev,next){if(!prev||!next||prev.innings!==next.innings||next.status==='complete')return 0;const before=legalCount(prev),after=legalCount(next),closed=Math.floor(after/6);return closed>Math.floor(before/6)&&after%6===0?closed:0}
 function calc(){let batRuns=0,extraRuns=0,w=0,legal=0,batBalls={},bowl={},recent=[];state.deliveries.forEach(d=>{const bat=String(d.batter||1),bow=String(d.bowler||1);batBalls[bat]??={r:0,b:0,f:0,s:0};bowl[bow]??={r:0,w:0,b:0};const isLegal=isLegalBall(d);const ex=d.extra_type||'';const ovr=ex==='overthrow'?(d.extra_runs||0):0;const extraOnly=ex==='overthrow'?0:(d.extra_runs||0);const total=(d.runs||0)+(d.extra_runs||0);batRuns+=(d.runs||0)+ovr;extraRuns+=extraOnly;if(d.wicket)w++;if(isLegal){legal++;batBalls[bat].b++;bowl[bow].b++}batBalls[bat].r+=(d.runs||0)+ovr;if(d.runs===4&&ex!=='overthrow')batBalls[bat].f++;if(d.runs===6&&ex!=='overthrow')batBalls[bat].s++;bowl[bow].r+=total;if(d.wicket&&!['run out','retired hurt'].includes(d.dismissal))bowl[bow].w++;recent.push({d,total,legal:isLegal})});return{total:batRuns+extraRuns,extraRuns,w,legal,batBalls,bowl,recent}}
 function oversText(n){return Math.floor(n/6)+'.'+(n%6)}
 function ballNote(d){
@@ -253,6 +256,7 @@ function showModal({title,message,confirmLabel='OK',showCancel=false,fields=fals
   document.addEventListener('keydown',modalKey);
   return new Promise(res=>{modalResolve=res});
 }
+async function notifyOverComplete(n){if(!n)return;await showModal({title:'Over complete',message:overWord(n)+' over completed. '+overWord(n+1)+' over start.',confirmLabel:'OK',showCancel:false})}
 async function notifyPhaseChange(){
   if(isComplete()&&state.result&&state.result.text){
     await showModal({title:'Match complete',message:state.result.text,confirmLabel:'OK',showCancel:false});
@@ -261,7 +265,7 @@ async function notifyPhaseChange(){
   }
   if(state.innings===2&&!(state.deliveries||[]).length)return showModal({title:'End innings',message:'2nd innings. Target '+state.target+'.',confirmLabel:'Start 2nd innings',showCancel:false});
 }
-async function addDelivery(runs=0,extra='',extraRuns=0,wicket=false){if(!isAdmin||!current||isComplete())return;try{const prevInnings=state.innings;const prevStatus=state.status;const batVal=$('batter')?$('batter').value:1;const bowlVal=$('bowler')?$('bowler').value:1;const d={runs,extra_type:extra,extra_runs:extraRuns,wicket,dismissal:wicket?'bowled':'',dismissed_player:batVal,batter:batVal,bowler:bowlVal};const r=await api('delivery','POST',{delivery:d},current);state=r.state;pendingExtra='';pendingWicket=false;syncPendingButtons();render();if(isComplete()&&prevStatus!=='complete')await notifyPhaseChange();else if(state.innings===2&&prevInnings===1)await notifyPhaseChange();else $('actionMessage').textContent='Delivery recorded.'}catch(e){alert(e.message)}}
+async function addDelivery(runs=0,extra='',extraRuns=0,wicket=false){if(!isAdmin||!current||isComplete())return;try{const prev=state;const prevInnings=state.innings;const prevStatus=state.status;const batVal=$('batter')?$('batter').value:1;const bowlVal=$('bowler')?$('bowler').value:1;const d={runs,extra_type:extra,extra_runs:extraRuns,wicket,dismissal:wicket?'bowled':'',dismissed_player:batVal,batter:batVal,bowler:bowlVal};const r=await api('delivery','POST',{delivery:d},current);const closed=overJustClosed(prev,r.state);state=r.state;pendingExtra='';pendingWicket=false;syncPendingButtons();render();if(isComplete()&&prevStatus!=='complete')await notifyPhaseChange();else if(state.innings===2&&prevInnings===1)await notifyPhaseChange();else if(closed)await notifyOverComplete(closed);else $('actionMessage').textContent='Delivery recorded.'}catch(e){alert(e.message)}}
 function commitExtra(type,additional,wicket){
   let runs=0,extraRuns=0;
   if(type==='wide'){extraRuns=1+additional;runs=0}
