@@ -521,6 +521,7 @@ if ($action === 'create') {
     'deliveries' => [],
     'crease' => null,
     'openers' => null,
+    'openers_innings' => null,
     'created' => date('c')
   ];
   $st = $pdo->prepare('INSERT INTO matches(title,state_json) VALUES(?,?)');
@@ -567,7 +568,8 @@ function snapshotInnings(array $s, array $stats): array
     'wickets' => $stats['w'],
     'legal' => $stats['legal'],
     'crease' => $s['crease'] ?? null,
-    'openers' => $s['openers'] ?? null
+    'openers' => $s['openers'] ?? null,
+    'openers_innings' => $s['openers_innings'] ?? null
   ];
 }
 function closeFirstInnings(array &$s): void
@@ -579,6 +581,7 @@ function closeFirstInnings(array &$s): void
   $s['deliveries'] = [];
   $s['crease'] = null;
   $s['openers'] = null;
+  $s['openers_innings'] = null;
   $s['status'] = 'live';
   unset($s['innings_2'], $s['result']);
 }
@@ -750,6 +753,7 @@ if ($action === 'set_crease') {
   $s['crease'] = $crease;
   if (!empty($b['set_as_openers']) || empty($s['openers'])) {
     $s['openers'] = $crease;
+    $s['openers_innings'] = (int)($s['innings'] ?? 1);
   }
   saveMatch($pdo, $id, $s);
   $pdo->commit();
@@ -856,6 +860,7 @@ if ($action === 'undo') {
     $s['deliveries'] = $s['innings_1']['deliveries'] ?? [];
     $s['crease'] = $s['innings_1']['crease'] ?? null;
     $s['openers'] = $s['innings_1']['openers'] ?? null;
+    $s['openers_innings'] = $s['innings_1']['openers_innings'] ?? 1;
     $s['innings'] = 1;
     $s['status'] = 'live';
     unset($s['target'], $s['innings_1'], $s['result'], $s['innings_2']);
