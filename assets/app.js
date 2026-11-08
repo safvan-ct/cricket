@@ -21,6 +21,7 @@ async function api(action, method = "GET", data = null, id = null) {
 		method,
 		headers: data ? { "Content-Type": "application/json" } : {},
 		body: data ? JSON.stringify(data) : undefined,
+		credentials: "same-origin",
 	});
 	const j = await r.json();
 	if (!r.ok) throw new Error(j.error || "Request failed");
