@@ -277,41 +277,34 @@ function renderRosterChips() {
 	if (poolA) {
 		poolA.innerHTML = "";
 		const qA = poolSearchA.trim().toLowerCase();
-		const listA = commonPlayers.filter((p) => !qA || p.toLowerCase().includes(qA));
+		const listA = commonPlayers.filter((p) => {
+			if (selectedRosterA.includes(p) || selectedRosterB.includes(p)) return false;
+			return !qA || p.toLowerCase().includes(qA);
+		});
 		if (!listA.length) {
 			const hint = document.createElement("span");
 			hint.className = "hint";
 			hint.style.fontSize = "11px";
-			hint.textContent = "No matching players in directory.";
+			hint.textContent = qA
+				? "No matching players in directory."
+				: "All directory players selected.";
 			poolA.append(hint);
 		} else {
 			listA.forEach((name) => {
 				const chip = document.createElement("span");
 				chip.className = "pool-chip";
 				chip.textContent = name;
-				const inA = selectedRosterA.includes(name);
-				const inB = selectedRosterB.includes(name);
-				if (inA) {
-					chip.classList.add("selected");
-					chip.title = "Selected in Team A (tap to remove)";
-					chip.onclick = () => {
-						selectedRosterA = selectedRosterA.filter((p) => p !== name);
-						renderRosterChips();
-					};
-				} else if (inB) {
-					chip.classList.add("disabled");
-					chip.title = "Already selected in Team B";
-					chip.textContent = name + " (Team B)";
-				} else {
-					chip.onclick = () => {
-						if (selectedRosterA.length >= maxA) {
-							showError(`Team A is full (${maxA} players). Increase player count to add more.`);
-							return;
-						}
-						selectedRosterA.push(name);
-						renderRosterChips();
-					};
-				}
+				chip.title = "Tap to add to Team A";
+				chip.onclick = () => {
+					if (selectedRosterA.length >= maxA) {
+						showError(
+							`Team A is full (${maxA} players). Increase player count to add more.`,
+						);
+						return;
+					}
+					selectedRosterA.push(name);
+					renderRosterChips();
+				};
 				poolA.append(chip);
 			});
 		}
@@ -322,7 +315,11 @@ function renderRosterChips() {
 			addChip.title = "Register a new player in directory";
 			addChip.onclick = async () => {
 				const newName = await showAddPlayerModal(poolSearchA.trim());
-				if (newName && selectedRosterA.length < maxA && !selectedRosterA.includes(newName)) {
+				if (
+					newName &&
+					selectedRosterA.length < maxA &&
+					!selectedRosterA.includes(newName)
+				) {
 					selectedRosterA.push(newName);
 					renderRosterChips();
 				}
@@ -336,7 +333,8 @@ function renderRosterChips() {
 	if (selB) {
 		selB.innerHTML = "";
 		if (!selectedRosterB.length) {
-			selB.innerHTML = '<span class="hint" style="margin:2px 4px;font-size:11px">No players selected. Tap from pool below.</span>';
+			selB.innerHTML =
+				'<span class="hint" style="margin:2px 4px;font-size:11px">No players selected. Tap from pool below.</span>';
 		} else {
 			selectedRosterB.forEach((name, idx) => {
 				const chip = document.createElement("span");
@@ -367,41 +365,34 @@ function renderRosterChips() {
 	if (poolB) {
 		poolB.innerHTML = "";
 		const qB = poolSearchB.trim().toLowerCase();
-		const listB = commonPlayers.filter((p) => !qB || p.toLowerCase().includes(qB));
+		const listB = commonPlayers.filter((p) => {
+			if (selectedRosterA.includes(p) || selectedRosterB.includes(p)) return false;
+			return !qB || p.toLowerCase().includes(qB);
+		});
 		if (!listB.length) {
 			const hint = document.createElement("span");
 			hint.className = "hint";
 			hint.style.fontSize = "11px";
-			hint.textContent = "No matching players in directory.";
+			hint.textContent = qB
+				? "No matching players in directory."
+				: "All directory players selected.";
 			poolB.append(hint);
 		} else {
 			listB.forEach((name) => {
 				const chip = document.createElement("span");
 				chip.className = "pool-chip";
 				chip.textContent = name;
-				const inA = selectedRosterA.includes(name);
-				const inB = selectedRosterB.includes(name);
-				if (inB) {
-					chip.classList.add("selected");
-					chip.title = "Selected in Team B (tap to remove)";
-					chip.onclick = () => {
-						selectedRosterB = selectedRosterB.filter((p) => p !== name);
-						renderRosterChips();
-					};
-				} else if (inA) {
-					chip.classList.add("disabled");
-					chip.title = "Already selected in Team A";
-					chip.textContent = name + " (Team A)";
-				} else {
-					chip.onclick = () => {
-						if (selectedRosterB.length >= maxB) {
-							showError(`Team B is full (${maxB} players). Increase player count to add more.`);
-							return;
-						}
-						selectedRosterB.push(name);
-						renderRosterChips();
-					};
-				}
+				chip.title = "Tap to add to Team B";
+				chip.onclick = () => {
+					if (selectedRosterB.length >= maxB) {
+						showError(
+							`Team B is full (${maxB} players). Increase player count to add more.`,
+						);
+						return;
+					}
+					selectedRosterB.push(name);
+					renderRosterChips();
+				};
 				poolB.append(chip);
 			});
 		}
