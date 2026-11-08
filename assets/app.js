@@ -96,12 +96,8 @@ function exitToMatches() {
 	loadMatches();
 }
 function goBackToMatches() {
-	if (history.state && history.state.page && history.state.page !== "matches") {
-		history.back();
-	} else {
-		pushNavState({ page: "matches" }, "", true);
-		exitToMatches();
-	}
+	exitToMatches();
+	pushNavState({ page: "matches" }, "", true);
 }
 function parseHashState() {
 	const hash = String(location.hash || "");
