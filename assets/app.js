@@ -1010,11 +1010,16 @@ async function showPlayerCareerModal(playerName) {
 		const bw = p.bowling;
 
 		const customContent = (container) => {
-			const hero = document.createElement("div");
-			hero.className = "career-hero";
-			hero.innerHTML = `
-				<h2>${p.name}</h2>
-				<p>${p.matches} Matches played across completed matches</p>
+			const heroSection = document.createElement("div");
+			heroSection.className = "career-hero-section";
+			heroSection.innerHTML = `
+				<div class="career-modal-header">
+					<h3 class="career-modal-title">Player Profile</h3>
+				</div>
+				<div class="career-hero">
+					<h2>${esc(p.name)}</h2>
+					<p>${p.matches} Matches played across completed matches</p>
+				</div>
 			`;
 
 			const batSub = document.createElement("div");
@@ -1049,7 +1054,7 @@ async function showPlayerCareerModal(playerName) {
 				<div class="career-stat-box"><span class="career-stat-val">${bw.average !== null ? bw.average : "—"}</span><span class="career-stat-lbl">Avg</span></div>
 			`;
 
-			container.append(hero, batSub, batSummary, bowlSub, bowlSummary);
+			container.append(heroSection, batSub, batSummary, bowlSub, bowlSummary);
 
 			if (p.match_log && p.match_log.length) {
 				const logSection = document.createElement("div");
@@ -1227,11 +1232,12 @@ async function showPlayerCareerModal(playerName) {
 		};
 
 		await showModal({
-			title: "Player Profile",
+			title: "",
 			message: "",
 			confirmLabel: "Close",
 			showCancel: false,
 			showClose: true,
+			modalClass: "player-profile-modal",
 			customContent,
 		});
 	} catch (e) {
@@ -2733,6 +2739,13 @@ function closeModal(ok) {
 		customEl.innerHTML = "";
 		customEl.classList.add("hidden");
 	}
+	const modalCard = $("modal") ? $("modal").querySelector(".modal-card") : null;
+	if (modalCard) {
+		modalCard.className = "modal-card";
+	}
+	if ($("modalTitle")) {
+		$("modalTitle").classList.remove("hidden");
+	}
 	if (modalResolve) {
 		const r = modalResolve;
 		modalResolve = null;
@@ -2750,8 +2763,16 @@ function showModal({
 	overNumber = 0,
 	qr = null,
 	customContent = null,
+	modalClass = "",
 }) {
-	$("modalTitle").textContent = title;
+	const modalCard = $("modal") ? $("modal").querySelector(".modal-card") : null;
+	if (modalCard) {
+		modalCard.className = "modal-card" + (modalClass ? " " + modalClass : "");
+	}
+	if ($("modalTitle")) {
+		$("modalTitle").textContent = title || "";
+		$("modalTitle").classList.toggle("hidden", !title);
+	}
 	$("modalMessage").textContent = message;
 	$("modalOk").textContent = confirmLabel;
 	const isClose = showClose !== null ? !!showClose : showCancel || !!qr;
