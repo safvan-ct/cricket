@@ -677,17 +677,26 @@ async function importPreviousMatch() {
 }
 
 async function showMatchPickerModal(matches) {
-	let selectedIndex = 0;
+	let selectedIndex = -1;
 	const customContent = (container) => {
 		const wrap = document.createElement("div");
 		wrap.style.cssText = "display:flex;flex-direction:column;gap:12px;text-align:left;";
 
 		const lbl = document.createElement("label");
 		lbl.style.cssText = "font-size:12px;font-weight:700;color:#3a5a7a;";
-		lbl.textContent = "Select previous match to import:";
+		lbl.textContent = "Select previous match to import *";
 
 		const sel = document.createElement("select");
-		sel.style.cssText = "width:100%;padding:10px 12px;border:1px solid #b0ccdf;border-radius:9px;font:inherit;";
+		sel.className = "app-select";
+		sel.required = true;
+
+		const defOpt = document.createElement("option");
+		defOpt.value = "";
+		defOpt.textContent = "Select any option";
+		defOpt.disabled = true;
+		defOpt.selected = true;
+		sel.append(defOpt);
+
 		matches.forEach((m, idx) => {
 			const st = m.state || {};
 			const opt = document.createElement("option");
@@ -706,6 +715,10 @@ async function showMatchPickerModal(matches) {
 		previewBox.style.cssText = "background:#f0f7ff;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:12px;display:flex;flex-direction:column;gap:6px;";
 
 		function updatePreview() {
+			if (selectedIndex < 0 || !matches[selectedIndex]) {
+				previewBox.innerHTML = '<span class="hint" style="margin:0;font-size:12px;color:var(--muted)">Please select a match from the dropdown above to preview details.</span>';
+				return;
+			}
 			const m = matches[selectedIndex];
 			const st = (m && m.state) || {};
 			const tA = st.team_a || "Team A";
@@ -726,7 +739,7 @@ async function showMatchPickerModal(matches) {
 		}
 
 		sel.onchange = () => {
-			selectedIndex = parseInt(sel.value, 10) || 0;
+			selectedIndex = sel.value === "" ? -1 : parseInt(sel.value, 10);
 			updatePreview();
 		};
 
@@ -742,9 +755,16 @@ async function showMatchPickerModal(matches) {
 		showCancel: true,
 		showClose: true,
 		customContent,
+		validate: () => {
+			if (selectedIndex < 0 || !matches[selectedIndex]) {
+				showError("Please select a match to import.");
+				return false;
+			}
+			return true;
+		},
 	});
 
-	if (ok) {
+	if (ok && selectedIndex >= 0 && matches[selectedIndex]) {
 		const m = matches[selectedIndex];
 		if (m && m.state) {
 			applyImportedMatch(m.state);
@@ -1986,55 +2006,63 @@ async function openInningsOpenerModal() {
 	const oppTeam = bowlingTeamName();
 
 	const hasCurrentOpeners = state.openers && Number(state.openers_innings) === Number(state.innings);
-	let striker = (hasCurrentOpeners && bRoster.includes(state.openers.striker))
-		? state.openers.striker
-		: bRoster[0] || "Player 1";
-	let nonStriker = (hasCurrentOpeners && bRoster.includes(state.openers.non_striker) && state.openers.non_striker !== striker)
-		? state.openers.non_striker
-		: bRoster[1] || bRoster[0] || "Player 2";
-	let bowler = (hasCurrentOpeners && bowRoster.includes(state.openers.bowler))
-		? state.openers.bowler
-		: bowRoster[0] || "Player 1";
+	let striker = "";
+	let nonStriker = "";
+	let bowler = "";
 
 	const content = (container) => {
 		const row1 = document.createElement("div");
 		row1.className = "modal-custom-row";
-		row1.innerHTML = `<label>Opening Striker (${innTeam} · Facing ball 1)</label>`;
+		row1.innerHTML = `<label>Opening Striker (${innTeam} · Facing ball 1) *</label>`;
 		const selStriker = document.createElement("select");
+		selStriker.className = "app-select";
+		selStriker.required = true;
+		const optStrikerDef = document.createElement("option");
+		optStrikerDef.value = "";
+		optStrikerDef.textContent = "Select any option";
+		optStrikerDef.disabled = true;
+		optStrikerDef.selected = true;
+		selStriker.append(optStrikerDef);
+
 		bRoster.forEach((p) => {
 			const opt = document.createElement("option");
 			opt.value = p;
 			opt.textContent = p;
-			if (p === striker) opt.selected = true;
 			selStriker.append(opt);
 		});
 
 		const row2 = document.createElement("div");
 		row2.className = "modal-custom-row";
-		row2.innerHTML = `<label>Opening Non-Striker (${innTeam})</label>`;
+		row2.innerHTML = `<label>Opening Non-Striker (${innTeam}) *</label>`;
 		const selNon = document.createElement("select");
+		selNon.className = "app-select";
+		selNon.required = true;
+		const optNonDef = document.createElement("option");
+		optNonDef.value = "";
+		optNonDef.textContent = "Select any option";
+		optNonDef.disabled = true;
+		optNonDef.selected = true;
+		selNon.append(optNonDef);
+
 		bRoster.forEach((p) => {
 			const opt = document.createElement("option");
 			opt.value = p;
 			opt.textContent = p;
-			if (p === nonStriker) opt.selected = true;
 			selNon.append(opt);
 		});
 
 		selStriker.onchange = () => {
 			striker = selStriker.value;
-			if (striker === nonStriker) {
-				const alt = bRoster.find((p) => p !== striker) || striker;
-				nonStriker = alt;
-				selNon.value = alt;
+			if (striker && striker === nonStriker) {
+				nonStriker = "";
+				selNon.value = "";
 			}
 		};
 		selNon.onchange = () => {
 			nonStriker = selNon.value;
-			if (nonStriker === striker) {
-				const alt = bRoster.find((p) => p !== nonStriker) || nonStriker;
-				striker = alt;
-				selStriker.value = alt;
+			if (nonStriker && nonStriker === striker) {
+				striker = "";
+				selStriker.value = "";
 			}
 		};
 
@@ -2043,13 +2071,21 @@ async function openInningsOpenerModal() {
 
 		const row3 = document.createElement("div");
 		row3.className = "modal-custom-row";
-		row3.innerHTML = `<label>Opening Bowler (${oppTeam})</label>`;
+		row3.innerHTML = `<label>Opening Bowler (${oppTeam}) *</label>`;
 		const selBow = document.createElement("select");
+		selBow.className = "app-select";
+		selBow.required = true;
+		const optBowDef = document.createElement("option");
+		optBowDef.value = "";
+		optBowDef.textContent = "Select any option";
+		optBowDef.disabled = true;
+		optBowDef.selected = true;
+		selBow.append(optBowDef);
+
 		bowRoster.forEach((p) => {
 			const opt = document.createElement("option");
 			opt.value = p;
 			opt.textContent = p;
-			if (p === bowler) opt.selected = true;
 			selBow.append(opt);
 		});
 		selBow.onchange = () => {
@@ -2067,6 +2103,25 @@ async function openInningsOpenerModal() {
 		showCancel: false,
 		showClose: false,
 		customContent: content,
+		validate: () => {
+			if (!striker) {
+				showError("Please select the opening striker.");
+				return false;
+			}
+			if (!nonStriker) {
+				showError("Please select the opening non-striker.");
+				return false;
+			}
+			if (!bowler) {
+				showError("Please select the opening bowler.");
+				return false;
+			}
+			if (striker === nonStriker) {
+				showError("Opening striker and non-striker must be different players.");
+				return false;
+			}
+			return true;
+		},
 	});
 
 	state.crease = { striker, non_striker: nonStriker, bowler };
@@ -2084,46 +2139,54 @@ async function openInningsOpenerModal() {
 	} catch (e) {}
 	render();
 }
-async function chooseNextBowlerModal(prevBowler) {
+async function chooseNextBowlerModal(prevBowler, defaultBowler = null) {
 	if (!isAdmin || !current || isComplete()) return;
 	const roster = bowlingRoster();
-	const c = calc();
-	let selected = null;
-	for (const p of roster) {
-		if (p !== prevBowler) {
-			selected = p;
-			break;
-		}
-	}
+	const curBowler = defaultBowler || (state.crease && state.crease.bowler) || "";
+	let selected = (curBowler && curBowler !== prevBowler && roster.includes(curBowler))
+		? curBowler
+		: "";
+
 	const content = (container) => {
-		const grid = document.createElement("div");
-		grid.className = "modal-select-grid";
+		const row = document.createElement("div");
+		row.className = "modal-custom-row";
+		row.innerHTML = `<label>Select Bowler *</label>`;
+
+		const sel = document.createElement("select");
+		sel.className = "app-select";
+		sel.required = true;
+
+		const defOpt = document.createElement("option");
+		defOpt.value = "";
+		defOpt.textContent = "Select any option";
+		defOpt.disabled = true;
+		if (!selected) defOpt.selected = true;
+		sel.append(defOpt);
+
 		roster.forEach((name) => {
-			const btn = document.createElement("button");
-			btn.type = "button";
 			const isPrev = name === prevBowler;
-			const bStat = c.bowl[name] || { r: 0, w: 0, b: 0, maidens: 0 };
-			const fig = `${oversText(bStat.b)} - ${bStat.maidens || 0} - ${bStat.r} - ${bStat.w}`;
-			btn.className =
-				"modal-select-btn" +
-				(name === selected ? " selected" : "") +
-				(isPrev ? " disabled" : "");
-			btn.innerHTML = `<span>${name} ${isPrev ? "<small>(Just bowled)</small>" : ""}</span><small>${fig}</small>`;
+			const opt = document.createElement("option");
+			opt.value = name;
+			opt.textContent = isPrev
+				? `${name} (Just bowled)`
+				: name;
 			if (isPrev) {
-				btn.disabled = true;
-			} else {
-				btn.onclick = () => {
-					selected = name;
-					grid
-						.querySelectorAll(".modal-select-btn")
-						.forEach((b) => b.classList.remove("selected"));
-					btn.classList.add("selected");
-				};
+				opt.disabled = true;
 			}
-			grid.append(btn);
+			if (name === selected) {
+				opt.selected = true;
+			}
+			sel.append(opt);
 		});
-		container.append(grid);
+
+		sel.onchange = () => {
+			selected = sel.value;
+		};
+
+		row.append(sel);
+		container.append(row);
 	};
+
 	const ok = await showModal({
 		title: "Select Bowler",
 		message: prevBowler
@@ -2133,6 +2196,13 @@ async function chooseNextBowlerModal(prevBowler) {
 		showCancel: false,
 		showClose: true,
 		customContent: content,
+		validate: () => {
+			if (!selected) {
+				showError("Please select a bowler to continue.");
+				return false;
+			}
+			return true;
+		},
 	});
 	if (ok && selected) {
 		state.crease ??= {};
@@ -2161,14 +2231,28 @@ async function changeBattersModal() {
 		? bRoster
 		: bRoster.filter((p) => !outSet.has(p));
 
-	let currentStriker = cr.striker || bRoster[0] || "Player 1";
-	let currentNonStriker = cr.non_striker || bRoster[1] || "Player 2";
+	let currentStriker = (cr.striker && availableBatters.includes(cr.striker))
+		? cr.striker
+		: "";
+	let currentNonStriker = (cr.non_striker && availableBatters.includes(cr.non_striker) && cr.non_striker !== currentStriker)
+		? cr.non_striker
+		: "";
 
 	const content = (container) => {
 		const row1 = document.createElement("div");
 		row1.className = "modal-custom-row";
-		row1.innerHTML = `<label>Striker (Facing ball)</label>`;
+		row1.innerHTML = `<label>Striker (Facing ball) *</label>`;
 		const selStriker = document.createElement("select");
+		selStriker.className = "app-select";
+		selStriker.required = true;
+
+		const optStrikerDef = document.createElement("option");
+		optStrikerDef.value = "";
+		optStrikerDef.textContent = "Select any option";
+		optStrikerDef.disabled = true;
+		if (!currentStriker) optStrikerDef.selected = true;
+		selStriker.append(optStrikerDef);
+
 		availableBatters.forEach((p) => {
 			const opt = document.createElement("option");
 			opt.value = p;
@@ -2178,13 +2262,27 @@ async function changeBattersModal() {
 		});
 		selStriker.onchange = () => {
 			currentStriker = selStriker.value;
+			if (currentStriker && currentStriker === currentNonStriker) {
+				currentNonStriker = "";
+				selNon.value = "";
+			}
 		};
 		row1.append(selStriker);
 
 		const row2 = document.createElement("div");
 		row2.className = "modal-custom-row";
-		row2.innerHTML = `<label>Non-Striker</label>`;
+		row2.innerHTML = `<label>Non-Striker *</label>`;
 		const selNon = document.createElement("select");
+		selNon.className = "app-select";
+		selNon.required = true;
+
+		const optNonDef = document.createElement("option");
+		optNonDef.value = "";
+		optNonDef.textContent = "Select any option";
+		optNonDef.disabled = true;
+		if (!currentNonStriker) optNonDef.selected = true;
+		selNon.append(optNonDef);
+
 		availableBatters.forEach((p) => {
 			const opt = document.createElement("option");
 			opt.value = p;
@@ -2194,6 +2292,10 @@ async function changeBattersModal() {
 		});
 		selNon.onchange = () => {
 			currentNonStriker = selNon.value;
+			if (currentNonStriker && currentNonStriker === currentStriker) {
+				currentStriker = "";
+				selStriker.value = "";
+			}
 		};
 		row2.append(selNon);
 
@@ -2207,6 +2309,21 @@ async function changeBattersModal() {
 		showCancel: false,
 		showClose: true,
 		customContent: content,
+		validate: () => {
+			if (!currentStriker) {
+				showError("Please select the striker.");
+				return false;
+			}
+			if (!currentNonStriker) {
+				showError("Please select the non-striker.");
+				return false;
+			}
+			if (currentStriker === currentNonStriker) {
+				showError("Striker and non-striker must be different players.");
+				return false;
+			}
+			return true;
+		},
 	});
 
 	if (ok) {
@@ -3218,6 +3335,7 @@ function renderCrease() {
 		changeBatBtn.classList.toggle("hidden", !isAdmin || isComplete() || isLone);
 }
 let modalResolve = null;
+let modalValidate = null;
 function modalKey(e) {
 	if (e.key === "Escape" && $("modal").dataset.allowDismiss === "1")
 		closeModal(false);
@@ -3284,6 +3402,7 @@ function closeModal(ok, keepHistory = false) {
 	if (modalResolve) {
 		const r = modalResolve;
 		modalResolve = null;
+		modalValidate = null;
 		r(!!ok);
 	}
 	if (modalHistoryActive && !isClosingModalFromPopstate && !keepHistory) {
@@ -3306,7 +3425,9 @@ function showModal({
 	qr = null,
 	customContent = null,
 	modalClass = "",
+	validate = null,
 }) {
+	modalValidate = validate || null;
 	const modalCard = $("modal") ? $("modal").querySelector(".modal-card") : null;
 	if (modalCard) {
 		modalCard.className = "modal-card" + (modalClass ? " " + modalClass : "");
@@ -3477,7 +3598,7 @@ async function notifyPhaseChange(overDetails = null) {
 		return;
 	}
 }
-async function openWicketDeliveryModal(extraType = "") {
+async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 	if (!isAdmin || !current || isComplete()) return;
 	await ensureCreaseInitialized();
 	const cr = state.crease || {};
@@ -3504,30 +3625,55 @@ async function openWicketDeliveryModal(extraType = "") {
 	// Case 2: Transition to lone batter -> this dismissal leaves 1 batter standing alone
 	const willBeLoneBatter = !isFinalWicket && unbatted.length === 0;
 
-	let dismissal = "bowled";
-	let dismissedPlayer = striker;
-	let nextBatter = !isFinalWicket && !willBeLoneBatter ? unbatted[0] || null : null;
-	let runs = 0;
+	let dismissal = "";
+	let dismissedPlayer = "";
+	let nextBatter = "";
+	let runs = initialRuns ? Math.min(3, Math.max(0, initialRuns)) : 0;
 
 	const content = (container) => {
 		const rowDismissal = document.createElement("div");
 		rowDismissal.className = "modal-custom-row";
-		rowDismissal.innerHTML = `<label>Dismissal Type</label>`;
+		rowDismissal.innerHTML = `<label>Dismissal Type *</label>`;
 		const selDismissal = document.createElement("select");
-		["bowled", "caught", "lbw", "run out", "stumped", "hit wicket"].forEach(
-			(d) => {
-				const opt = document.createElement("option");
-				opt.value = d;
-				opt.textContent = d.toUpperCase();
-				selDismissal.append(opt);
-			},
-		);
+		selDismissal.className = "app-select";
+		selDismissal.required = true;
+
+		const optDismissalDef = document.createElement("option");
+		optDismissalDef.value = "";
+		optDismissalDef.textContent = "Select any option";
+		optDismissalDef.disabled = true;
+		optDismissalDef.selected = true;
+		selDismissal.append(optDismissalDef);
+
+		const dismissalList =
+			extraType === "wide"
+				? ["stumped", "run out", "hit wicket", "bowled", "caught", "lbw"]
+				: extraType === "no-ball"
+				? ["run out", "hit wicket", "bowled", "caught", "lbw", "stumped"]
+				: ["bowled", "caught", "lbw", "run out", "stumped", "hit wicket"];
+
+		dismissalList.forEach((d) => {
+			const opt = document.createElement("option");
+			opt.value = d;
+			opt.textContent = d.toUpperCase();
+			selDismissal.append(opt);
+		});
 		rowDismissal.append(selDismissal);
 
 		const rowPlayer = document.createElement("div");
 		rowPlayer.className = "modal-custom-row";
-		rowPlayer.innerHTML = `<label>Dismissed Batter</label>`;
+		rowPlayer.innerHTML = `<label>Dismissed Batter *</label>`;
 		const selPlayer = document.createElement("select");
+		selPlayer.className = "app-select";
+		selPlayer.required = true;
+
+		const optPlayerDef = document.createElement("option");
+		optPlayerDef.value = "";
+		optPlayerDef.textContent = "Select any option";
+		optPlayerDef.disabled = true;
+		optPlayerDef.selected = true;
+		selPlayer.append(optPlayerDef);
+
 		const optStriker = document.createElement("option");
 		optStriker.value = striker;
 		optStriker.textContent = isCurrentlyLone
@@ -3543,17 +3689,33 @@ async function openWicketDeliveryModal(extraType = "") {
 		rowPlayer.append(selPlayer);
 
 		const rowRuns = document.createElement("div");
-		rowRuns.className = "modal-custom-row";
-		rowRuns.innerHTML = `<label>Runs completed before dismissal</label>`;
+		rowRuns.className = "modal-custom-row hidden";
+		rowRuns.innerHTML = `<label>Runs completed before dismissal *</label>`;
 		const selRuns = document.createElement("select");
+		selRuns.className = "app-select";
+		selRuns.required = true;
+		selRuns.disabled = true;
+
+		const optRunsDef = document.createElement("option");
+		optRunsDef.value = "";
+		optRunsDef.textContent = "Select any option";
+		optRunsDef.disabled = true;
+		optRunsDef.selected = true;
+		selRuns.append(optRunsDef);
+
 		[0, 1, 2, 3].forEach((r) => {
 			const opt = document.createElement("option");
 			opt.value = r;
-			opt.textContent = r + " runs";
+			opt.textContent = r === 1 ? "1 run" : r + " runs";
 			selRuns.append(opt);
 		});
+		if (initialRuns && [0, 1, 2, 3].includes(initialRuns)) {
+			selRuns.value = String(initialRuns);
+			runs = initialRuns;
+		}
 		rowRuns.append(selRuns);
 
+		let selNext = null;
 		const rowNext = document.createElement("div");
 		rowNext.className = "modal-custom-row";
 		if (isFinalWicket) {
@@ -3572,8 +3734,18 @@ async function openWicketDeliveryModal(extraType = "") {
 				</div>
 			`;
 		} else {
-			rowNext.innerHTML = `<label>Next Incoming Batter</label>`;
-			const selNext = document.createElement("select");
+			rowNext.innerHTML = `<label>Next Incoming Batter *</label>`;
+			selNext = document.createElement("select");
+			selNext.className = "app-select";
+			selNext.required = true;
+
+			const optNextDef = document.createElement("option");
+			optNextDef.value = "";
+			optNextDef.textContent = "Select any option";
+			optNextDef.disabled = true;
+			optNextDef.selected = true;
+			selNext.append(optNextDef);
+
 			unbatted.forEach((p) => {
 				const opt = document.createElement("option");
 				opt.value = p;
@@ -3588,12 +3760,25 @@ async function openWicketDeliveryModal(extraType = "") {
 
 		function updateVisibility() {
 			const isRunOut = selDismissal.value === "run out";
+			rowPlayer.classList.toggle("hidden", !selDismissal.value);
 			selPlayer.disabled = !isRunOut || isCurrentlyLone;
-			if (!isRunOut) {
+			if (selDismissal.value && !isRunOut) {
 				selPlayer.value = striker;
 				dismissedPlayer = striker;
+			} else if (!selDismissal.value) {
+				selPlayer.value = "";
+				dismissedPlayer = "";
 			}
 			rowRuns.classList.toggle("hidden", !isRunOut);
+			selRuns.disabled = !isRunOut;
+			if (!isRunOut) {
+				selRuns.value = "";
+				runs = 0;
+			} else if (selRuns.value !== "") {
+				runs = parseInt(selRuns.value, 10);
+			} else {
+				runs = null;
+			}
 			if (willBeLoneBatter) {
 				const loneEl = $("loneBatterNotice");
 				if (loneEl) {
@@ -3616,7 +3801,7 @@ async function openWicketDeliveryModal(extraType = "") {
 			}
 		};
 		selRuns.onchange = () => {
-			runs = parseInt(selRuns.value, 10) || 0;
+			runs = selRuns.value === "" ? null : parseInt(selRuns.value, 10);
 		};
 
 		updateVisibility();
@@ -3643,19 +3828,51 @@ async function openWicketDeliveryModal(extraType = "") {
 		confirmLabel: modalConfirm,
 		showCancel: true,
 		customContent: content,
+		validate: () => {
+			if (!dismissal) {
+				showError("Please select a dismissal type.");
+				return false;
+			}
+			const isRunOut = dismissal === "run out";
+			if (isRunOut) {
+				dismissedPlayer = selPlayer.value;
+				if (!dismissedPlayer) {
+					showError("Please select the dismissed batter.");
+					return false;
+				}
+				const r = selRuns.value === "" ? null : parseInt(selRuns.value, 10);
+				if (r === null || isNaN(r)) {
+					showError("Please select runs completed before dismissal.");
+					return false;
+				}
+				runs = r;
+			} else {
+				dismissedPlayer = striker;
+				runs = 0;
+			}
+			if (!isFinalWicket && !willBeLoneBatter && !nextBatter) {
+				showError("Please select the next incoming batter.");
+				return false;
+			}
+			return true;
+		},
 	});
 
 	if (!ok) return;
 
+	const completedRuns = (dismissal === "run out" && runs !== null && !isNaN(runs)) ? runs : 0;
 	let extraRuns = 0;
 	if (extraType === "wide") {
-		extraRuns = 1 + runs;
+		extraRuns = 1 + completedRuns;
 		runs = 0;
 	} else if (extraType === "no-ball") {
 		extraRuns = 1;
-	} else if (extraType === "bye") {
-		extraRuns = runs === 0 ? 1 : runs;
+		runs = completedRuns;
+	} else if (extraType === "bye" || extraType === "leg-bye") {
+		extraRuns = completedRuns === 0 ? 1 : completedRuns;
 		runs = 0;
+	} else {
+		runs = completedRuns;
 	}
 
 	await recordBallWithRotation({
@@ -3900,7 +4117,7 @@ async function openDeliveryPopup(type) {
 	const additional = addonValue();
 	const wicket = $("modalWicket").checked;
 	if (wicket) {
-		await openWicketDeliveryModal(type);
+		await openWicketDeliveryModal(type, additional);
 	} else {
 		commitExtra(type, additional, false);
 	}
@@ -3937,7 +4154,7 @@ $("changeBowlerBtn").onclick = async () => {
 	if (!isAdmin || !current || !state || isComplete()) return;
 	await ensureCreaseInitialized();
 	const prevBowler = getPreviousOverBowler();
-	await chooseNextBowlerModal(prevBowler);
+	await chooseNextBowlerModal(prevBowler, (state.crease && state.crease.bowler) || null);
 };
 $("undo").onclick = async () => {
 	if (!state) return;
@@ -4018,7 +4235,31 @@ $("endMatch").onclick = async () => {
 		showError(e.message);
 	}
 };
-$("modalOk").onclick = () => closeModal(true);
+$("modalOk").onclick = async () => {
+	const custom = $("modalCustom");
+	if (custom && !custom.classList.contains("hidden")) {
+		const requiredSelects = custom.querySelectorAll("select[required]");
+		for (const sel of requiredSelects) {
+			if (sel.disabled || sel.closest(".hidden") || sel.offsetParent === null) {
+				continue;
+			}
+			if (!sel.value) {
+				try {
+					sel.focus();
+					if (typeof sel.reportValidity === "function") {
+						sel.reportValidity();
+					}
+				} catch (e) {}
+				return;
+			}
+		}
+	}
+	if (typeof modalValidate === "function") {
+		const valid = await modalValidate();
+		if (!valid) return;
+	}
+	closeModal(true);
+};
 $("modalClose").onclick = () => closeModal(false);
 if ($("modalCancel")) $("modalCancel").onclick = () => closeModal(false);
 $("modal").onclick = (e) => {
