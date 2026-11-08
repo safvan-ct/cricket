@@ -1752,11 +1752,10 @@ td:first-child {
 
 .player-directory-head {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 12px;
-    flex-wrap: wrap
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    margin-bottom: 12px
 }
 
 .player-directory-head h3 {
@@ -1764,18 +1763,26 @@ td:first-child {
     font-size: 16px
 }
 
+.search-filter-box {
+    width: 100%
+}
+
 .stats-search-input {
-    padding: 8px 12px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 14px;
     border: 1.5px solid var(--line);
-    border-radius: 8px;
-    font-size: 13px;
+    border-radius: 9px;
+    font-size: 14px;
     outline: none;
     transition: border-color .15s;
-    min-width: 200px
+    background: #fff
 }
 
 .stats-search-input:focus {
-    border-color: var(--sky)
+    border-color: var(--blue);
+    outline: 2px solid var(--blue);
+    outline-offset: 1px
 }
 
 .player-stats-table tr {
@@ -2094,7 +2101,58 @@ td:first-child {
     gap: 8px;
     margin-top: 14px;
     padding-top: 10px;
-    border-top: 1px solid var(--line)
+    border-top: 1px solid var(--line);
+    align-items: center
+}
+
+.career-actions button {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 8px 4px;
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+    white-space: nowrap
+}
+
+.career-actions button.status-inactive {
+    background: #e7f7ed;
+    color: #127c36;
+    border-color: #b7e8c6
+}
+
+.player-status-badge {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    padding: 2px 7px;
+    border-radius: 6px;
+    vertical-align: middle;
+    display: inline-block;
+    margin-left: 6px
+}
+
+.player-status-badge.active {
+    background: #e7f7ed;
+    color: #127c36;
+    border: 1px solid #b7e8c6
+}
+
+.player-status-badge.inactive,
+.badge-inactive {
+    background: #fdf2f2;
+    color: #b31b1b;
+    border: 1px solid #f8caca;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    padding: 2px 6px;
+    border-radius: 5px;
+    vertical-align: middle;
+    display: inline-block;
+    margin-left: 5px
 }
 
 /* Pagination Components */

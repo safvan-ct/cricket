@@ -226,7 +226,9 @@ let playerStatsFilter = "";
 async function loadCommonPlayers() {
 	try {
 		const r = await api("players");
-		commonPlayers = (r.players || []).map((p) => p.name);
+		commonPlayers = (r.players || [])
+			.filter((p) => p.is_active === undefined || Number(p.is_active) === 1)
+			.map((p) => p.name);
 	} catch (e) {
 		commonPlayers = [];
 	}
@@ -923,8 +925,9 @@ function renderPlayerDirectory(stats, filterQuery = "") {
 		const bw = p.bowling;
 		const tr = document.createElement("tr");
 		tr.onclick = () => showPlayerCareerModal(p.name);
+		const isInactive = p.is_active !== undefined && Number(p.is_active) === 0;
 		tr.innerHTML = `
-			<td class="sc-col-player"><strong>${p.name}</strong></td>
+			<td class="sc-col-player"><strong>${esc(p.name)}</strong>${isInactive ? ' <span class="badge-inactive">Inactive</span>' : ""}</td>
 			<td class="sc-num">${p.matches}</td>
 			<td class="sc-num"><strong>${b.runs}</strong></td>
 			<td class="sc-num">${b.hs_display}</td>
@@ -1012,7 +1015,7 @@ async function showPlayerCareerModal(playerName) {
 					<h3 class="career-modal-title">Player Profile</h3>
 				</div>
 				<div class="career-hero">
-					<h2>${esc(p.name)}</h2>
+					<h2>${esc(p.name)} <span id="careerStatusBadge" class="player-status-badge ${Number(p.is_active) === 0 ? "inactive" : "active"}">${Number(p.is_active) === 0 ? "Inactive" : "Active"}</span></h2>
 					<p>${p.matches} Matches played across completed matches</p>
 				</div>
 			`;
@@ -1182,10 +1185,48 @@ async function showPlayerCareerModal(playerName) {
 			if (isAdmin) {
 				const adminActions = document.createElement("div");
 				adminActions.className = "career-actions";
+
+				let isActive = p.is_active !== undefined ? Number(p.is_active) === 1 : true;
+
+				const statusBtn = document.createElement("button");
+				statusBtn.type = "button";
+				statusBtn.className = "ghost" + (isActive ? "" : " status-inactive");
+				statusBtn.textContent = isActive ? "Mark Inactive" : "Mark Active";
+				statusBtn.title = isActive
+					? "Deactivate player (hides from match drafting pool)"
+					: "Activate player (shows in match drafting pool)";
+
+				statusBtn.onclick = async () => {
+					try {
+						const nextActive = isActive ? 0 : 1;
+						await api("player_toggle_active", "POST", { id: p.id, is_active: nextActive });
+						isActive = !isActive;
+						p.is_active = isActive ? 1 : 0;
+						statusBtn.textContent = isActive ? "Mark Inactive" : "Mark Active";
+						statusBtn.className = "ghost" + (isActive ? "" : " status-inactive");
+						statusBtn.title = isActive
+							? "Deactivate player (hides from match drafting pool)"
+							: "Activate player (shows in match drafting pool)";
+						const badge = container.querySelector("#careerStatusBadge");
+						if (badge) {
+							badge.textContent = isActive ? "Active" : "Inactive";
+							badge.className = "player-status-badge " + (isActive ? "active" : "inactive");
+						}
+						await loadCommonPlayers();
+						if (mainTab === "stats") {
+							await loadPlayerStats();
+						} else {
+							renderRosterChips();
+						}
+					} catch (err) {
+						showError(err.message);
+					}
+				};
+
 				const renameBtn = document.createElement("button");
 				renameBtn.type = "button";
 				renameBtn.className = "ghost";
-				renameBtn.textContent = "Rename player";
+				renameBtn.textContent = "Rename";
 				renameBtn.onclick = () => {
 					closeModal(false);
 					setTimeout(() => showRenamePlayerModal(p), 60);
@@ -1194,7 +1235,7 @@ async function showPlayerCareerModal(playerName) {
 				const delBtn = document.createElement("button");
 				delBtn.type = "button";
 				delBtn.className = "ghost error";
-				delBtn.textContent = "Delete player";
+				delBtn.textContent = "Delete";
 				delBtn.onclick = () => {
 					closeModal(false);
 					setTimeout(async () => {
@@ -1221,7 +1262,7 @@ async function showPlayerCareerModal(playerName) {
 					}, 60);
 				};
 
-				adminActions.append(renameBtn, delBtn);
+				adminActions.append(statusBtn, renameBtn, delBtn);
 				container.append(adminActions);
 			}
 		};

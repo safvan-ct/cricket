@@ -76,9 +76,15 @@ function ensurePlayersTable(PDO $pdo): void
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
     role VARCHAR(50) DEFAULT 'All-Rounder',
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+  try {
+    $pdo->exec("ALTER TABLE players ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1");
+  } catch (PDOException $e) {}
+
   $checked = true;
 }
 
@@ -102,12 +108,13 @@ function normalizePlayerName(mixed $val): string
   return $v;
 }
 
-function initPlayerStatsRow(mixed $name, int $id = 0): array
+function initPlayerStatsRow(mixed $name, int $id = 0, int $isActive = 1): array
 {
   $name = (string)$name;
   return [
     'id' => $id,
     'name' => $name,
+    'is_active' => $isActive,
     'matches' => 0,
     'batting' => [
       'innings' => 0,
@@ -149,12 +156,12 @@ function computeAllPlayerStats(PDO $pdo, ?string $targetPlayer = null): array
 {
   ensurePlayersTable($pdo);
   $matches = $pdo->query("SELECT id, title, state_json, created_at, updated_at FROM matches ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC);
-  $playersQuery = $pdo->query("SELECT id, name FROM players ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+  $playersQuery = $pdo->query("SELECT id, name, is_active FROM players ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
   $stats = [];
   foreach ($playersQuery as $p) {
     $name = (string)$p['name'];
-    $stats[$name] = initPlayerStatsRow($name, (int)$p['id']);
+    $stats[$name] = initPlayerStatsRow($name, (int)$p['id'], (int)($p['is_active'] ?? 1));
   }
 
   foreach ($matches as $m) {
@@ -436,7 +443,7 @@ function allMatches(PDO $pdo): array
 if ($action === 'list') respond(['matches' => allMatches($pdo)]);
 if ($action === 'players') {
   ensurePlayersTable($pdo);
-  $rows = $pdo->query('SELECT id, name, created_at FROM players ORDER BY name ASC')->fetchAll();
+  $rows = $pdo->query('SELECT id, name, is_active, created_at FROM players ORDER BY name ASC')->fetchAll();
   respond(['players' => $rows]);
 }
 if ($action === 'player_create') {
@@ -496,6 +503,25 @@ if ($action === 'player_delete') {
   $st = $pdo->prepare('DELETE FROM players WHERE id=?');
   $st->execute([$pId]);
   respond(['ok' => true]);
+}
+if ($action === 'player_toggle_active') {
+  requireAdmin();
+  $b = body();
+  $pId = (int)($b['id'] ?? 0);
+  if ($pId <= 0) respond(['error' => 'Valid player ID required'], 422);
+  ensurePlayersTable($pdo);
+  $active = isset($b['is_active']) ? (int)$b['is_active'] : null;
+  if ($active === null) {
+    $st = $pdo->prepare('UPDATE players SET is_active = 1 - is_active WHERE id=?');
+    $st->execute([$pId]);
+  } else {
+    $st = $pdo->prepare('UPDATE players SET is_active = ? WHERE id=?');
+    $st->execute([$active ? 1 : 0, $pId]);
+  }
+  $st = $pdo->prepare('SELECT id, name, is_active FROM players WHERE id=?');
+  $st->execute([$pId]);
+  $player = $st->fetch(PDO::FETCH_ASSOC);
+  respond(['ok' => true, 'player' => $player]);
 }
 if ($action === 'player_stats') {
   $target = isset($_GET['name']) ? trim((string)$_GET['name']) : null;
