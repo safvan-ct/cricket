@@ -1249,41 +1249,127 @@ async function showPlayerCareerModal(playerName) {
 	}
 }
 
+function parsePlayerNameAndTag(raw) {
+	raw = (raw || "").trim();
+	const m = raw.match(/^(.*?)\s*\((.*?)\)$/);
+	if (m) {
+		return { baseName: m[1].trim(), tag: m[2].trim() };
+	}
+	return { baseName: raw, tag: "" };
+}
+
+function formatPlayerDisplayName(baseName, tag) {
+	baseName = (baseName || "").trim();
+	tag = (tag || "").trim();
+	if (!tag) return baseName;
+	const m = baseName.match(/^(.*?)\s*\((.*?)\)$/);
+	if (m) {
+		return `${m[1].trim()} (${tag})`;
+	}
+	return `${baseName} (${tag})`;
+}
+
 async function showAddPlayerModal(prefill = "") {
-	let enteredName = prefill || "";
+	const parsed = parsePlayerNameAndTag(prefill);
+	let enteredName = parsed.baseName;
+	let enteredTag = parsed.tag;
+	let validationError = "";
+
 	while (true) {
-		let inputRef = null;
+		let nameInputRef = null;
+		let tagInputRef = null;
+		let previewValRef = null;
+
+		function updatePreview() {
+			const b = (nameInputRef ? nameInputRef.value : enteredName).trim();
+			const t = (tagInputRef ? tagInputRef.value : enteredTag).trim();
+			const disp = formatPlayerDisplayName(b, t);
+			if (previewValRef) {
+				previewValRef.textContent = disp || "—";
+			}
+		}
+
 		const content = (container) => {
-			const row = document.createElement("div");
-			row.className = "modal-custom-row";
+			if (validationError) {
+				const errBox = document.createElement("div");
+				errBox.className = "modal-alert-error";
+				errBox.style.cssText =
+					"color:#b31b1b;background:#fdf2f2;border:1px solid #f8caca;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:600;margin-bottom:8px;line-height:1.4;";
+				errBox.textContent = validationError;
+				container.append(errBox);
+			}
 
-			const label = document.createElement("label");
-			label.textContent = "Player Name";
+			// Row 1: Player Name
+			const rowName = document.createElement("div");
+			rowName.className = "modal-custom-row";
+			const lblName = document.createElement("label");
+			lblName.textContent = "Player Name *";
+			const inpName = document.createElement("input");
+			inpName.type = "text";
+			inpName.className = "modal-input";
+			inpName.placeholder = "Enter player name (e.g. Rahul, Rohit)";
+			inpName.value = enteredName;
+			inpName.autocomplete = "off";
+			nameInputRef = inpName;
 
-			const input = document.createElement("input");
-			input.type = "text";
-			input.className = "modal-input";
-			input.placeholder = "Enter player name (e.g. Virat Kohli)";
-			input.value = enteredName;
-			input.autocomplete = "off";
-			inputRef = input;
-
-			input.oninput = () => {
-				enteredName = input.value;
+			inpName.oninput = () => {
+				enteredName = inpName.value;
+				updatePreview();
 			};
-			input.onkeydown = (e) => {
+			inpName.onkeydown = (e) => {
+				if (e.key === "Enter") {
+					e.preventDefault();
+					if (tagInputRef) tagInputRef.focus();
+				}
+			};
+
+			rowName.append(lblName, inpName);
+
+			// Row 2: Jersey # / Identifier
+			const rowTag = document.createElement("div");
+			rowTag.className = "modal-custom-row";
+			rowTag.style.marginTop = "6px";
+			const lblTag = document.createElement("label");
+			lblTag.innerHTML = `Jersey # / Identifier <span class="hint" style="font-weight:400;font-size:11px; margin: 0px;">(Optional — differentiates players with same name)</span>`;
+			const inpTag = document.createElement("input");
+			inpTag.type = "text";
+			inpTag.className = "modal-input";
+			inpTag.placeholder = "e.g. 7, 18, K, Parel, Jr";
+			inpTag.value = enteredTag;
+			inpTag.autocomplete = "off";
+			tagInputRef = inpTag;
+
+			inpTag.oninput = () => {
+				enteredTag = inpTag.value;
+				updatePreview();
+			};
+			inpTag.onkeydown = (e) => {
 				if (e.key === "Enter") {
 					e.preventDefault();
 					closeModal(true);
 				}
 			};
 
-			row.append(label, input);
-			container.append(row);
+			rowTag.append(lblTag, inpTag);
+
+			// Row 3: Preview Box
+			const prevBox = document.createElement("div");
+			prevBox.style.cssText =
+				"font-size:12px;font-weight:600;color:var(--muted);background:#f4f9fd;border:1px dashed var(--sky);border-radius:8px;padding:8px 12px;margin-top:8px;display:flex;align-items:center;justify-content:space-between;";
+			prevBox.innerHTML = `<span>Full Display Name:</span><strong style="color:var(--blue);font-size:13px" id="playerPreviewVal"></strong>`;
+			container.append(rowName, rowTag, prevBox);
+
+			previewValRef = prevBox.querySelector("#playerPreviewVal");
+			updatePreview();
 
 			setTimeout(() => {
-				input.focus();
-				if (enteredName) input.select();
+				if (validationError && tagInputRef && enteredName) {
+					tagInputRef.focus();
+					if (enteredTag) tagInputRef.select();
+				} else if (inpName) {
+					inpName.focus();
+					if (enteredName) inpName.select();
+				}
 			}, 80);
 		};
 
@@ -1298,71 +1384,152 @@ async function showAddPlayerModal(prefill = "") {
 
 		if (!ok) return null;
 
-		const name = (inputRef ? inputRef.value : enteredName).trim();
-		if (!name) {
-			await showError("Player name cannot be empty.");
+		const base = (nameInputRef ? nameInputRef.value : enteredName).trim();
+		const tag = (tagInputRef ? tagInputRef.value : enteredTag).trim();
+
+		if (!base) {
+			validationError = "Player name cannot be empty.";
 			continue;
 		}
 
-		const existing = commonPlayers.find(
-			(p) => p.toLowerCase() === name.toLowerCase(),
+		const fullName = formatPlayerDisplayName(base, tag);
+
+		// Check if exact full name already exists
+		const exactMatch = commonPlayers.find(
+			(p) => p.toLowerCase() === fullName.toLowerCase(),
 		);
-		if (existing) {
-			await showError(`"${existing}" already exists in the player directory.`);
+		if (exactMatch) {
+			validationError = `"${exactMatch}" already exists. Please choose a different jersey # or identifier.`;
 			continue;
+		}
+
+		// If no tag was provided, check if baseName already exists to prompt for tag
+		if (!tag) {
+			const baseMatch = commonPlayers.find(
+				(p) => p.toLowerCase() === base.toLowerCase(),
+			);
+			if (baseMatch) {
+				validationError = `A player named "${baseMatch}" already exists. Please enter a Jersey # or Identifier below to distinguish them.`;
+				continue;
+			}
 		}
 
 		try {
-			await api("player_create", "POST", { name });
+			await api("player_create", "POST", { name: fullName });
 			await loadCommonPlayers();
 			if (mainTab === "stats") {
 				await loadPlayerStats();
 			} else {
 				renderRosterChips();
 			}
-			return name;
+			return fullName;
 		} catch (err) {
-			await showError(err.message);
+			validationError = err.message;
 			continue;
 		}
 	}
 }
 
 async function showRenamePlayerModal(p) {
-	let enteredName = p.name;
+	const parsed = parsePlayerNameAndTag(p.name);
+	let enteredName = parsed.baseName;
+	let enteredTag = parsed.tag;
+	let validationError = "";
+
 	while (true) {
-		let inputRef = null;
+		let nameInputRef = null;
+		let tagInputRef = null;
+		let previewValRef = null;
+
+		function updatePreview() {
+			const b = (nameInputRef ? nameInputRef.value : enteredName).trim();
+			const t = (tagInputRef ? tagInputRef.value : enteredTag).trim();
+			const disp = formatPlayerDisplayName(b, t);
+			if (previewValRef) {
+				previewValRef.textContent = disp || "—";
+			}
+		}
+
 		const content = (container) => {
-			const row = document.createElement("div");
-			row.className = "modal-custom-row";
+			if (validationError) {
+				const errBox = document.createElement("div");
+				errBox.className = "modal-alert-error";
+				errBox.style.cssText =
+					"color:#b31b1b;background:#fdf2f2;border:1px solid #f8caca;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:600;margin-bottom:8px;line-height:1.4;";
+				errBox.textContent = validationError;
+				container.append(errBox);
+			}
 
-			const label = document.createElement("label");
-			label.textContent = "Player Name";
+			// Row 1: Player Name
+			const rowName = document.createElement("div");
+			rowName.className = "modal-custom-row";
+			const lblName = document.createElement("label");
+			lblName.textContent = "Player Name *";
+			const inpName = document.createElement("input");
+			inpName.type = "text";
+			inpName.className = "modal-input";
+			inpName.placeholder = "Enter new player name...";
+			inpName.value = enteredName;
+			inpName.autocomplete = "off";
+			nameInputRef = inpName;
 
-			const input = document.createElement("input");
-			input.type = "text";
-			input.className = "modal-input";
-			input.placeholder = "Enter new player name...";
-			input.value = enteredName;
-			input.autocomplete = "off";
-			inputRef = input;
-
-			input.oninput = () => {
-				enteredName = input.value;
+			inpName.oninput = () => {
+				enteredName = inpName.value;
+				updatePreview();
 			};
-			input.onkeydown = (e) => {
+			inpName.onkeydown = (e) => {
+				if (e.key === "Enter") {
+					e.preventDefault();
+					if (tagInputRef) tagInputRef.focus();
+				}
+			};
+
+			rowName.append(lblName, inpName);
+
+			// Row 2: Jersey # / Identifier
+			const rowTag = document.createElement("div");
+			rowTag.className = "modal-custom-row";
+			rowTag.style.marginTop = "6px";
+			const lblTag = document.createElement("label");
+			lblTag.innerHTML = `Jersey # / Identifier <span class="hint" style="font-weight:400;font-size:11px">(Optional)</span>`;
+			const inpTag = document.createElement("input");
+			inpTag.type = "text";
+			inpTag.className = "modal-input";
+			inpTag.placeholder = "e.g. 7, 18, K, Parel, Jr";
+			inpTag.value = enteredTag;
+			inpTag.autocomplete = "off";
+			tagInputRef = inpTag;
+
+			inpTag.oninput = () => {
+				enteredTag = inpTag.value;
+				updatePreview();
+			};
+			inpTag.onkeydown = (e) => {
 				if (e.key === "Enter") {
 					e.preventDefault();
 					closeModal(true);
 				}
 			};
 
-			row.append(label, input);
-			container.append(row);
+			rowTag.append(lblTag, inpTag);
+
+			// Row 3: Preview Box
+			const prevBox = document.createElement("div");
+			prevBox.style.cssText =
+				"font-size:12px;font-weight:600;color:var(--muted);background:#f4f9fd;border:1px dashed var(--sky);border-radius:8px;padding:8px 12px;margin-top:8px;display:flex;align-items:center;justify-content:space-between;";
+			prevBox.innerHTML = `<span>Full Display Name:</span><strong style="color:var(--blue);font-size:13px" id="playerPreviewVal"></strong>`;
+			container.append(rowName, rowTag, prevBox);
+
+			previewValRef = prevBox.querySelector("#playerPreviewVal");
+			updatePreview();
 
 			setTimeout(() => {
-				input.focus();
-				input.select();
+				if (validationError && tagInputRef) {
+					tagInputRef.focus();
+				} else if (inpName) {
+					inpName.focus();
+					inpName.select();
+				}
 			}, 80);
 		};
 
@@ -1377,32 +1544,38 @@ async function showRenamePlayerModal(p) {
 
 		if (!ok) return null;
 
-		const newName = (inputRef ? inputRef.value : enteredName).trim();
-		if (!newName) {
-			await showError("Player name cannot be empty.");
+		const base = (nameInputRef ? nameInputRef.value : enteredName).trim();
+		const tag = (tagInputRef ? tagInputRef.value : enteredTag).trim();
+
+		if (!base) {
+			validationError = "Player name cannot be empty.";
 			continue;
 		}
-		if (newName === p.name) return p.name;
+
+		const newFullName = formatPlayerDisplayName(base, tag);
+		if (newFullName === p.name) return p.name;
 
 		const existing = commonPlayers.find(
-			(cp) => cp.toLowerCase() === newName.toLowerCase() && cp.toLowerCase() !== p.name.toLowerCase(),
+			(cp) =>
+				cp.toLowerCase() === newFullName.toLowerCase() &&
+				cp.toLowerCase() !== p.name.toLowerCase(),
 		);
 		if (existing) {
-			await showError(`A player named "${existing}" already exists.`);
+			validationError = `A player named "${existing}" already exists. Please choose a different jersey # or identifier.`;
 			continue;
 		}
 
 		try {
-			await api("player_update", "POST", { id: p.id, name: newName });
+			await api("player_update", "POST", { id: p.id, name: newFullName });
 			await loadCommonPlayers();
 			if (mainTab === "stats") {
 				await loadPlayerStats();
 			} else {
 				renderRosterChips();
 			}
-			return newName;
+			return newFullName;
 		} catch (err) {
-			await showError(err.message);
+			validationError = err.message;
 			continue;
 		}
 	}

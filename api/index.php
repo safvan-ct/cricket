@@ -442,8 +442,17 @@ if ($action === 'players') {
 if ($action === 'player_create') {
   requireAdmin();
   $b = body();
-  $name = trim((string)($b['name'] ?? ''));
-  if ($name === '') respond(['error' => 'Player name is required'], 422);
+  $rawName = trim((string)($b['name'] ?? ''));
+  $tag = trim((string)($b['tag'] ?? ''));
+  if ($rawName === '') respond(['error' => 'Player name is required'], 422);
+
+  $name = $rawName;
+  if ($tag !== '') {
+    if (!preg_match('/\(' . preg_quote($tag, '/') . '\)$/', $name)) {
+      $name = rtrim(preg_replace('/\s*\(.*?\)$/', '', $name)) . ' (' . $tag . ')';
+    }
+  }
+
   ensurePlayersTable($pdo);
   try {
     $st = $pdo->prepare('INSERT INTO players(name) VALUES(?)');
@@ -451,25 +460,32 @@ if ($action === 'player_create') {
     $newId = (int)$pdo->lastInsertId();
     respond(['ok' => true, 'player' => ['id' => $newId, 'name' => $name]], 201);
   } catch (PDOException $e) {
-    $st = $pdo->prepare('SELECT id, name FROM players WHERE name=?');
-    $st->execute([$name]);
-    $existing = $st->fetch();
-    if ($existing) {
-      respond(['ok' => true, 'player' => ['id' => (int)$existing['id'], 'name' => $existing['name']]]);
-    }
-    respond(['error' => 'Could not save player: ' . $e->getMessage()], 422);
+    respond(['error' => "A player named '$name' already exists. Please provide a unique jersey # or identifier."], 422);
   }
 }
 if ($action === 'player_update') {
   requireAdmin();
   $b = body();
   $pId = (int)($b['id'] ?? 0);
-  $name = trim((string)($b['name'] ?? ''));
-  if ($pId <= 0 || $name === '') respond(['error' => 'Valid ID and name required'], 422);
+  $rawName = trim((string)($b['name'] ?? ''));
+  $tag = trim((string)($b['tag'] ?? ''));
+  if ($pId <= 0 || $rawName === '') respond(['error' => 'Valid ID and name required'], 422);
+
+  $name = $rawName;
+  if ($tag !== '') {
+    if (!preg_match('/\(' . preg_quote($tag, '/') . '\)$/', $name)) {
+      $name = rtrim(preg_replace('/\s*\(.*?\)$/', '', $name)) . ' (' . $tag . ')';
+    }
+  }
+
   ensurePlayersTable($pdo);
-  $st = $pdo->prepare('UPDATE players SET name=? WHERE id=?');
-  $st->execute([$name, $pId]);
-  respond(['ok' => true, 'player' => ['id' => $pId, 'name' => $name]]);
+  try {
+    $st = $pdo->prepare('UPDATE players SET name=? WHERE id=?');
+    $st->execute([$name, $pId]);
+    respond(['ok' => true, 'player' => ['id' => $pId, 'name' => $name]]);
+  } catch (PDOException $e) {
+    respond(['error' => "A player named '$name' already exists. Please choose a different jersey # or identifier."], 422);
+  }
 }
 if ($action === 'player_delete') {
   requireAdmin();
