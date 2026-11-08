@@ -502,8 +502,6 @@ function fillSetup(mode) {
 		$("battingA").checked = true;
 		selectedRosterA = [];
 		selectedRosterB = [];
-		autoFillRoster("A");
-		autoFillRoster("B");
 	}
 	if (editingMatch && state) {
 		$("teamA").value = state.team_a || "";
@@ -598,11 +596,17 @@ $("setupForm").onsubmit = async (e) => {
 		const maxA = Math.max(2, Math.min(15, parseInt($("playersA").value, 10) || 7));
 		const maxB = Math.max(2, Math.min(15, parseInt($("playersB").value, 10) || 7));
 
-		while (selectedRosterA.length < maxA) {
-			autoFillRoster("A");
+		if (selectedRosterA.length < maxA) {
+			showError(
+				`Please select ${maxA} players for ${$("teamA").value.trim() || "Team A"} (currently ${selectedRosterA.length}/${maxA}) or use Auto-fill.`,
+			);
+			return;
 		}
-		while (selectedRosterB.length < maxB) {
-			autoFillRoster("B");
+		if (selectedRosterB.length < maxB) {
+			showError(
+				`Please select ${maxB} players for ${$("teamB").value.trim() || "Team B"} (currently ${selectedRosterB.length}/${maxB}) or use Auto-fill.`,
+			);
+			return;
 		}
 
 		const finalRosterA = selectedRosterA.slice(0, maxA);
