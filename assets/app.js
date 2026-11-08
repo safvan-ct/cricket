@@ -2059,8 +2059,20 @@ function appendOverSection(
 			const h = document.createElement("div");
 			h.className = "over-card-head";
 			const title = document.createElement("h3");
-			title.textContent =
-				"Over " + (i + 1) + (markCurrent && !ov.complete ? " · current" : "");
+			const bowlersInOver = [
+				...new Set((ov.balls || []).map((d) => d && d.bowler).filter(Boolean)),
+			];
+			const bowlerName = bowlersInOver.length
+				? bowlersInOver.join(" / ")
+				: (markCurrent &&
+						!ov.complete &&
+						state &&
+						state.crease &&
+						state.crease.bowler) ||
+					"";
+			title.textContent = bowlerName
+				? `${bowlerName} (Over ${i + 1})${markCurrent && !ov.complete ? " · current" : ""}`
+				: `Over ${i + 1}${markCurrent && !ov.complete ? " · current" : ""}`;
 			const runs = document.createElement("span");
 			runs.textContent = overRuns(ov.balls) + " runs";
 			h.append(title, runs);
@@ -2630,7 +2642,7 @@ function render() {
 function renderCrease() {
 	const hud = $("creaseHud");
 	if (!hud) return;
-	if (!state) {
+	if (!state || isComplete() || state.status === "complete" || state.status === "ended") {
 		hud.classList.add("hidden");
 		return;
 	}
@@ -2785,7 +2797,15 @@ function showModal({
 			const head = document.createElement("div");
 			head.className = "over-card-head";
 			const hTitle = document.createElement("h3");
-			hTitle.textContent = overNumber ? "Over " + overNumber : "This over";
+			const bowlersInOver = [
+				...new Set((balls || []).map((d) => d && d.bowler).filter(Boolean)),
+			];
+			const bName = bowlersInOver.length ? bowlersInOver.join(" / ") : "";
+			hTitle.textContent = bName && overNumber
+				? `${bName} (Over ${overNumber})`
+				: overNumber
+					? "Over " + overNumber
+					: "This over";
 			const runs = document.createElement("span");
 			const r = overRuns(balls);
 			const w = balls.filter((d) => d.wicket).length;
