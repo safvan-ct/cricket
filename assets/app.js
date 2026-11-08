@@ -46,18 +46,79 @@ function show(id) {
 		}
 	}
 }
+let isNavigatingHistory = false;
+let modalHistoryActive = false;
+let isClosingModalFromUI = false;
+let isClosingModalFromPopstate = false;
+
 function readScoreId() {
-	const m = String(location.hash || "").match(/^#m=(\d+)$/);
+	const m = String(location.hash || "").match(/^#m=(\d+)/);
 	return m ? m[1] : null;
 }
+function pushNavState(state, hash, replace = false) {
+	if (isNavigatingHistory) return;
+	const url = location.pathname + location.search + (hash ? hash : "");
+	if (replace) {
+		history.replaceState(state, "", url);
+	} else {
+		history.pushState(state, "", url);
+	}
+}
 function rememberMatch(id) {
-	const next = "#m=" + id;
-	if (location.hash !== next)
-		history.replaceState(null, "", location.pathname + location.search + next);
+	const tab = activeScoreTab === "scorecard" ? "&tab=scorecard" : "";
+	const next = "#m=" + id + tab;
+	if (isNavigatingHistory) return;
+	pushNavState({ page: "match", matchId: id, tab: activeScoreTab }, next, false);
 }
 function forgetMatch() {
-	if (location.hash)
-		history.replaceState(null, "", location.pathname + location.search);
+	if (isNavigatingHistory) return;
+	pushNavState({ page: "matches" }, "", true);
+}
+function exitToMatches() {
+	stopPoll();
+	current = null;
+	editingMatch = false;
+	setPendingExtra("");
+	mainTab = "matches";
+	show("app");
+	$("matchesView").classList.remove("hidden");
+	$("statsView").classList.add("hidden");
+	$("setupView").classList.add("hidden");
+	$("scoreView").classList.add("hidden");
+	$("login").classList.add("hidden");
+	const tabM = $("tabMatches");
+	const tabS = $("tabStats");
+	if (tabM && tabS) {
+		tabM.classList.add("active");
+		tabS.classList.remove("active");
+	}
+	headerMode();
+	loadMatches();
+}
+function goBackToMatches() {
+	if (history.state && history.state.page && history.state.page !== "matches") {
+		history.back();
+	} else {
+		pushNavState({ page: "matches" }, "", true);
+		exitToMatches();
+	}
+}
+function parseHashState() {
+	const hash = String(location.hash || "");
+	const matchHit = hash.match(/^#m=(\d+)/);
+	if (matchHit) {
+		return {
+			page: "match",
+			matchId: matchHit[1],
+			tab: hash.includes("tab=scorecard") ? "scorecard" : "live",
+		};
+	}
+	if (hash === "#stats") return { page: "stats" };
+	if (hash === "#setup") {
+		return { page: "setup", mode: editingMatch ? "update" : "create", matchId: current };
+	}
+	if (hash === "#login") return { page: "login" };
+	return { page: "matches" };
 }
 function stopPoll() {
 	if (pollTimer) {
@@ -141,14 +202,35 @@ async function boot() {
 	}
 	applyRole();
 	await loadCommonPlayers();
+	const hash = String(location.hash || "");
 	const id = readScoreId();
-	if (id) {
-		try {
-			await openMatch(id);
+	if (id || hash === "#stats" || hash === "#setup" || hash === "#login") {
+		history.replaceState({ page: "matches" }, "", location.pathname + location.search);
+		if (id) {
+			const tab = hash.includes("tab=scorecard") ? "scorecard" : "live";
+			history.pushState(
+				{ page: "match", matchId: id, tab },
+				"",
+				location.pathname + location.search + hash,
+			);
+			try {
+				await openMatch(id, true);
+				return;
+			} catch (e) {
+				pushNavState({ page: "matches" }, "", true);
+			}
+		} else if (hash === "#stats") {
+			history.pushState({ page: "stats" }, "", location.pathname + location.search + hash);
+			show("app");
+			applyMainTab("stats");
 			return;
-		} catch (e) {
-			forgetMatch();
+		} else if (hash === "#login") {
+			history.pushState({ page: "login" }, "", location.pathname + location.search + hash);
+			show("login");
+			return;
 		}
+	} else {
+		history.replaceState({ page: "matches" }, "", location.pathname + location.search);
 	}
 	show("app");
 	loadMatches();
@@ -167,6 +249,7 @@ if ($("qrBtn")) {
 }
 $("loginBtn").onclick = () => {
 	$("loginError").textContent = "";
+	pushNavState({ page: "login" }, "#login");
 	show("login");
 };
 $("togglePassword").onclick = () => {
@@ -180,9 +263,7 @@ $("togglePassword").onclick = () => {
 	$("eyeOff").classList.toggle("hidden", !show);
 };
 $("backToMatches").onclick = () => {
-	forgetMatch();
-	show("app");
-	loadMatches();
+	goBackToMatches();
 };
 $("loginForm").onsubmit = async (e) => {
 	e.preventDefault();
@@ -191,9 +272,8 @@ $("loginForm").onsubmit = async (e) => {
 		$("password").value = "";
 		isAdmin = true;
 		applyRole();
-		forgetMatch();
-		show("app");
-		loadMatches();
+		pushNavState({ page: "matches" }, "", true);
+		exitToMatches();
 	} catch (err) {
 		$("loginError").textContent = err.message;
 	}
@@ -204,9 +284,8 @@ $("logout").onclick = async () => {
 	isAdmin = false;
 	current = null;
 	applyRole();
-	forgetMatch();
-	show("app");
-	loadMatches();
+	pushNavState({ page: "matches" }, "", true);
+	exitToMatches();
 };
 function matchStarted() {
 	const balls =
@@ -539,15 +618,21 @@ $("newMatch").onclick = async () => {
 	stopPoll();
 	editingMatch = false;
 	await loadCommonPlayers();
+	pushNavState({ page: "setup", mode: "create" }, "#setup");
 	fillSetup("create");
 };
 $("updateMatch").onclick = async () => {
 	if (!isAdmin || !current || !state || state.status === "complete") return;
 	stopPoll();
 	await loadCommonPlayers();
+	pushNavState({ page: "setup", mode: "update", matchId: current }, "#setup");
 	fillSetup("update");
 };
 $("cancelSetup").onclick = () => {
+	if (history.state && history.state.page === "setup") {
+		history.back();
+		return;
+	}
 	if (editingMatch && current) {
 		editingMatch = false;
 		$("setupView").classList.add("hidden");
@@ -557,20 +642,10 @@ $("cancelSetup").onclick = () => {
 		return;
 	}
 	editingMatch = false;
-	forgetMatch();
-	show("app");
-	headerMode();
-	loadMatches();
+	goBackToMatches();
 };
 $("back").onclick = () => {
-	stopPoll();
-	current = null;
-	editingMatch = false;
-	setPendingExtra("");
-	forgetMatch();
-	show("app");
-	headerMode();
-	loadMatches();
+	goBackToMatches();
 };
 function syncTossPills() {
 	const a = ($("teamA").value.trim() || "Team A").toUpperCase();
@@ -624,12 +699,18 @@ $("setupForm").onsubmit = async (e) => {
 			editingMatch = false;
 			$("setupView").classList.add("hidden");
 			$("scoreView").classList.remove("hidden");
+			pushNavState(
+				{ page: "match", matchId: current, tab: activeScoreTab },
+				"#m=" + current + (activeScoreTab === "scorecard" ? "&tab=scorecard" : ""),
+				true,
+			);
 			headerMode();
 			render();
 			startViewerPoll();
 		} else {
 			const r = await api("create", "POST", body);
-			await openMatch(r.id);
+			pushNavState({ page: "match", matchId: r.id, tab: "live" }, "#m=" + r.id, true);
+			await openMatch(r.id, true);
 		}
 		await loadCommonPlayers();
 	} catch (err) {
@@ -811,7 +892,7 @@ async function loadMatches() {
 		showError(e.message);
 	}
 }
-function setMainTab(tab) {
+function applyMainTab(tab) {
 	mainTab = tab;
 	const tabM = $("tabMatches");
 	const tabS = $("tabStats");
@@ -825,6 +906,21 @@ function setMainTab(tab) {
 		loadPlayerStats();
 	} else {
 		loadMatches();
+	}
+}
+
+function setMainTab(tab) {
+	if (mainTab === tab) return;
+	if (tab === "matches") {
+		if (history.state && history.state.page === "stats") {
+			history.back();
+			return;
+		}
+		pushNavState({ page: "matches" }, "", true);
+		applyMainTab("matches");
+	} else {
+		pushNavState({ page: "stats" }, "#stats");
+		applyMainTab("stats");
 	}
 }
 
@@ -1114,8 +1210,17 @@ async function showPlayerCareerModal(playerName) {
 						if (entry.match_id) {
 							tr.title = "View match scoreboard";
 							tr.onclick = async () => {
-								closeModal(false);
-								await openMatch(entry.match_id);
+								closeModal(false, true);
+								if (history.state && history.state.isModal) {
+									pushNavState(
+										{ page: "match", matchId: entry.match_id, tab: "scorecard" },
+										"#m=" + entry.match_id,
+										true,
+									);
+									await openMatch(entry.match_id, true);
+								} else {
+									await openMatch(entry.match_id);
+								}
 							};
 						}
 						tbody.append(tr);
@@ -1229,7 +1334,7 @@ async function showPlayerCareerModal(playerName) {
 				renameBtn.className = "ghost";
 				renameBtn.textContent = "Rename";
 				renameBtn.onclick = () => {
-					closeModal(false);
+					closeModal(false, true);
 					setTimeout(() => showRenamePlayerModal(p), 60);
 				};
 
@@ -1238,7 +1343,7 @@ async function showPlayerCareerModal(playerName) {
 				delBtn.className = "ghost error";
 				delBtn.textContent = "Delete";
 				delBtn.onclick = () => {
-					closeModal(false);
+					closeModal(false, true);
 					setTimeout(async () => {
 						const ok = await showModal({
 							title: "Delete Player",
@@ -1979,7 +2084,7 @@ async function ensureCreaseInitialized() {
 	}
 	await openInningsOpenerModal();
 }
-async function openMatch(id) {
+async function openMatch(id, skipHistory = false) {
 	const r = await api("get", "GET", null, id);
 	current = id;
 	state = r.state;
@@ -1999,7 +2104,10 @@ async function openMatch(id) {
 	fillPlayers();
 	render();
 	startViewerPoll();
-	rememberMatch(id);
+	if (!skipHistory && !isNavigatingHistory) {
+		const tab = activeScoreTab === "scorecard" ? "&tab=scorecard" : "";
+		pushNavState({ page: "match", matchId: id, tab: activeScoreTab }, "#m=" + id + tab);
+	}
 	if (isAdmin && !isComplete()) {
 		await ensureCreaseInitialized();
 	}
@@ -2396,7 +2504,12 @@ function setPendingExtra(type) {
 let activeScoreTab = "live";
 let openScorecardInningsKey = null;
 function setScoreTab(tab) {
+	if (activeScoreTab === tab) return;
 	activeScoreTab = tab;
+	if (current && !isNavigatingHistory) {
+		const tabHash = tab === "scorecard" ? "&tab=scorecard" : "";
+		pushNavState({ page: "match", matchId: current, tab }, "#m=" + current + tabHash);
+	}
 	render();
 }
 function teamName(s, side) {
@@ -2542,13 +2655,13 @@ function computeInningsScorecard(
 		if (crease.striker && batting[crease.striker]) {
 			batting[crease.striker].hasBatted = true;
 			if (!batting[crease.striker].isOut) {
-				batting[crease.striker].dismissal = "batting *";
+				batting[crease.striker].dismissal = "batting";
 			}
 		}
 		if (crease.non_striker && batting[crease.non_striker]) {
 			batting[crease.non_striker].hasBatted = true;
 			if (!batting[crease.non_striker].isOut) {
-				batting[crease.non_striker].dismissal = "not out *";
+				batting[crease.non_striker].dismissal = "not out";
 			}
 		}
 	}
@@ -2613,7 +2726,7 @@ function renderScorecardHTML(title, data, isOpen, inningsKey) {
 			html += `
 				<tr>
 					<td class="sc-col-player">
-						<span class="sc-player-name">${b.name}</span>
+						<span class="sc-player-name">${b.name}${!b.isOut ? "*" : ""}</span>
 						<span class="sc-dismissal">${b.dismissal}</span>
 					</td>
 					<td class="sc-num"><strong>${b.runs}</strong></td>
@@ -2868,13 +2981,25 @@ function render() {
 		$("actionMessage").textContent =
 			state.result && state.result.text ? state.result.text : "Match complete.";
 	}
-	const overs = groupOvers(state.deliveries || []);
-	const lastOver = overs.length ? overs[overs.length - 1] : null;
-	const stickyOver = lastOver && !lastOver.complete ? lastOver.balls : [];
-	const overRunCount = overRuns(stickyOver);
-	$("thisOverRuns").textContent =
-		overRunCount === 1 ? "1 run" : overRunCount + " runs";
-	renderOverChips($("recent"), stickyOver);
+	const matchEnded = Boolean(
+		isComplete() || (state && (state.status === "complete" || state.status === "ended"))
+	);
+	const thisOverEl = document.querySelector(".this-over");
+	if (thisOverEl) {
+		thisOverEl.classList.toggle("hidden", matchEnded);
+	}
+	if (!matchEnded) {
+		const overs = groupOvers(state.deliveries || []);
+		const lastOver = overs.length ? overs[overs.length - 1] : null;
+		const stickyOver = lastOver && !lastOver.complete ? lastOver.balls : [];
+		const overRunCount = overRuns(stickyOver);
+		$("thisOverRuns").textContent =
+			overRunCount === 1 ? "1 run" : overRunCount + " runs";
+		renderOverChips($("recent"), stickyOver);
+	} else {
+		const recentEl = $("recent");
+		if (recentEl) recentEl.innerHTML = "";
+	}
 	renderOverCards();
 	renderCrease();
 }
@@ -2959,7 +3084,7 @@ function renderQrCode(container, url) {
 	img.height = 180;
 	container.append(img);
 }
-function closeModal(ok) {
+function closeModal(ok, keepHistory = false) {
 	$("modal").classList.add("hidden");
 	$("modal").setAttribute("aria-hidden", "true");
 	document.removeEventListener("keydown", modalKey);
@@ -2990,6 +3115,13 @@ function closeModal(ok) {
 		const r = modalResolve;
 		modalResolve = null;
 		r(!!ok);
+	}
+	if (modalHistoryActive && !isClosingModalFromPopstate && !keepHistory) {
+		modalHistoryActive = false;
+		isClosingModalFromUI = true;
+		history.back();
+	} else if (!keepHistory) {
+		modalHistoryActive = false;
 	}
 }
 function showModal({
@@ -3096,6 +3228,10 @@ function showModal({
 	$("modal").classList.remove("hidden");
 	$("modal").setAttribute("aria-hidden", "false");
 	document.addEventListener("keydown", modalKey);
+	if (!modalHistoryActive && !isNavigatingHistory) {
+		modalHistoryActive = true;
+		history.pushState({ ...(history.state || {}), isModal: true }, "");
+	}
 	return new Promise((res) => {
 		modalResolve = res;
 	});
@@ -3720,7 +3856,15 @@ $("modal").onclick = (e) => {
 		closeModal(false);
 };
 const tabLive = $("tabLive");
-if (tabLive) tabLive.onclick = () => setScoreTab("live");
+if (tabLive) {
+	tabLive.onclick = () => {
+		if (activeScoreTab === "scorecard" && history.state && history.state.tab === "scorecard") {
+			history.back();
+		} else {
+			setScoreTab("live");
+		}
+	};
+}
 const tabScorecard = $("tabScorecard");
 if (tabScorecard) tabScorecard.onclick = () => setScoreTab("scorecard");
 
@@ -3728,6 +3872,14 @@ const tabMatches = $("tabMatches");
 if (tabMatches) tabMatches.onclick = () => setMainTab("matches");
 const tabStats = $("tabStats");
 if (tabStats) tabStats.onclick = () => setMainTab("stats");
+
+const brandEl = document.querySelector(".brand");
+if (brandEl) {
+	brandEl.style.cursor = "pointer";
+	brandEl.onclick = () => {
+		goBackToMatches();
+	};
+}
 
 const addPBtn = $("addPlayerBtn");
 if (addPBtn) {
@@ -3779,5 +3931,74 @@ const autoFillABtn = $("autoFillA");
 if (autoFillABtn) autoFillABtn.onclick = () => autoFillRoster("A");
 const autoFillBBtn = $("autoFillB");
 if (autoFillBBtn) autoFillBBtn.onclick = () => autoFillRoster("B");
+
+window.addEventListener("popstate", async (e) => {
+	if (isClosingModalFromUI) {
+		isClosingModalFromUI = false;
+		return;
+	}
+
+	if (modalHistoryActive) {
+		modalHistoryActive = false;
+		isClosingModalFromPopstate = true;
+		closeModal(false);
+		isClosingModalFromPopstate = false;
+		return;
+	}
+
+	isNavigatingHistory = true;
+	try {
+		const target = e.state || parseHashState();
+		if (!target || target.page === "matches") {
+			exitToMatches();
+		} else if (target.page === "stats") {
+			if (!$("scoreView").classList.contains("hidden")) {
+				stopPoll();
+				current = null;
+			}
+			editingMatch = false;
+			show("app");
+			applyMainTab("stats");
+		} else if (target.page === "match") {
+			if (current && String(current) === String(target.matchId)) {
+				editingMatch = false;
+				$("setupView").classList.add("hidden");
+				$("scoreView").classList.remove("hidden");
+				$("matchesView").classList.add("hidden");
+				$("statsView").classList.add("hidden");
+				$("login").classList.add("hidden");
+				if (target.tab && target.tab !== activeScoreTab) {
+					activeScoreTab = target.tab;
+					render();
+				}
+				headerMode();
+				startViewerPoll();
+			} else {
+				activeScoreTab = target.tab || "live";
+				await openMatch(target.matchId, true);
+			}
+		} else if (target.page === "setup") {
+			if (target.mode === "update" && target.matchId) {
+				if (!current || String(current) !== String(target.matchId)) {
+					await openMatch(target.matchId, true);
+				}
+				fillSetup("update");
+			} else {
+				fillSetup("create");
+			}
+		} else if (target.page === "login") {
+			stopPoll();
+			current = null;
+			editingMatch = false;
+			show("login");
+		} else {
+			exitToMatches();
+		}
+	} catch (err) {
+		exitToMatches();
+	} finally {
+		isNavigatingHistory = false;
+	}
+});
 
 boot();
