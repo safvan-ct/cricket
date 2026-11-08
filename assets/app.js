@@ -1661,6 +1661,19 @@ function bowlingTeamName() {
 	if (!state) return "Bowling Team";
 	return battingSide() === "B" ? (state.team_a || "Team A") : (state.team_b || "Team B");
 }
+function bowlingSide() {
+	return battingSide() === "B" ? "A" : "B";
+}
+function maxWicketsForSide(side, s = state) {
+	if (!s) return 7;
+	const count = side === "B"
+		? (s.players_b || s.players || 7)
+		: (s.players_a || s.players || 7);
+	return Math.max(1, count);
+}
+function maxWickets(s = state) {
+	return maxWicketsForSide(battingSide(), s);
+}
 
 function hasValidInningsOpeners() {
 	if (!state || !state.openers) return false;
@@ -1677,12 +1690,15 @@ function hasValidInningsOpeners() {
 function isCreaseValidForCurrentInnings(cr = null) {
 	if (!state) return false;
 	const c = cr || state.crease;
-	if (!c || !c.striker || !c.non_striker || !c.bowler) return false;
-	if (c.striker === c.non_striker) return false;
+	if (!c || !c.striker || !c.bowler) return false;
 	const bRoster = battingRoster();
 	const bowRoster = bowlingRoster();
-	if (!bRoster.includes(c.striker) || !bRoster.includes(c.non_striker)) return false;
+	if (!bRoster.includes(c.striker)) return false;
 	if (!bowRoster.includes(c.bowler)) return false;
+	if (c.non_striker) {
+		if (c.striker === c.non_striker) return false;
+		if (!bRoster.includes(c.non_striker)) return false;
+	}
 	return true;
 }
 
@@ -2546,6 +2562,9 @@ function computeInningsScorecard(
 		}
 	});
 
+	const maxW = Math.max(1, batRoster ? batRoster.length : 7);
+	const isAllOut = totalWickets >= maxW;
+
 	return {
 		batting,
 		bowling,
@@ -2555,6 +2574,7 @@ function computeInningsScorecard(
 		totalWickets,
 		legalBalls,
 		batRoster,
+		isAllOut,
 	};
 }
 function renderScorecardHTML(title, data, isOpen, inningsKey) {
@@ -2562,11 +2582,12 @@ function renderScorecardHTML(title, data, isOpen, inningsKey) {
 		data.legalBalls > 0
 			? (data.totalRuns / (data.legalBalls / 6)).toFixed(2)
 			: "0.00";
+	const allOutBadge = data.isAllOut ? " · All Out" : "";
 	let html = `
 		<details class="over-team scorecard-innings" name="scorecard-accordion" data-innings="${inningsKey}" ${isOpen ? "open" : ""}>
 			<summary class="over-team-summary scorecard-innings-head">
 				<span class="over-team-name">${title}</span>
-				<span class="over-team-score">${data.totalRuns}/${data.totalWickets} (${oversText(data.legalBalls)} Ov)</span>
+				<span class="over-team-score">${data.totalRuns}/${data.totalWickets} (${oversText(data.legalBalls)} Ov${allOutBadge})</span>
 			</summary>
 			<div class="over-team-body scorecard-innings-body">
 			<table class="sc-table">
@@ -2782,7 +2803,9 @@ function render() {
 	$("sbTeam").textContent = team;
 	$("sbTotal").textContent = c.total;
 	$("sbWickets").textContent = c.w;
-	$("sbOvers").textContent = oversText(c.legal);
+	const maxW = maxWickets(state);
+	const isAllOut = c.w >= maxW;
+	$("sbOvers").textContent = oversText(c.legal) + (isAllOut ? " · All Out" : "");
 	const rr = c.legal ? (c.total / (c.legal / 6)).toFixed(2) : "0.00";
 	$("sbRR").textContent = rr;
 	const needBlock = $("sbNeedBlock");
@@ -2867,29 +2890,36 @@ function renderCrease() {
 	const bRoster = battingRoster();
 	const bowRoster = bowlingRoster();
 	const sName = cr.striker || bRoster[0] || "Striker";
-	const nsName = cr.non_striker || bRoster[1] || "Non-Striker";
+	const isLone = !cr.non_striker;
+	const nsName = isLone ? "" : (cr.non_striker || bRoster[1] || "Non-Striker");
 	const bName = cr.bowler || bowRoster[0] || "Bowler";
 
 	const sStat = c.batBalls[sName] || { r: 0, b: 0, f: 0, s: 0 };
-	const nsStat = c.batBalls[nsName] || { r: 0, b: 0, f: 0, s: 0 };
+	const nsStat = nsName ? (c.batBalls[nsName] || { r: 0, b: 0, f: 0, s: 0 }) : { r: 0, b: 0, f: 0, s: 0 };
 	const bStat = c.bowl[bName] || { r: 0, w: 0, b: 0, maidens: 0 };
 
 	$("strikerName").textContent = sName;
 	$("strikerStat").textContent = `${sStat.r} (${sStat.b}) · 4s: ${sStat.f} · 6s: ${sStat.s}`;
 
-	$("nonStrikerName").textContent = nsName;
-	$("nonStrikerStat").textContent = `${nsStat.r} (${nsStat.b}) · 4s: ${nsStat.f} · 6s: ${nsStat.s}`;
+	const nonStrikerRow = $("nonStrikerRow");
+	if (nonStrikerRow) {
+		nonStrikerRow.classList.toggle("hidden", isLone);
+		if (!isLone) {
+			$("nonStrikerName").textContent = nsName;
+			$("nonStrikerStat").textContent = `${nsStat.r} (${nsStat.b}) · 4s: ${nsStat.f} · 6s: ${nsStat.s}`;
+		}
+	}
 
 	const bOvers = oversText(bStat.b);
 	const econ = bStat.b > 0 ? ((bStat.r / bStat.b) * 6).toFixed(2) : "0.00";
 	$("bowlerName").textContent = bName;
 	$("bowlerStat").textContent = `${bOvers} - ${bStat.maidens || 0} - ${bStat.r} - ${bStat.w} · Econ: ${econ}`;
 
-	$("swapStrikeBtn").classList.toggle("hidden", !isAdmin || isComplete());
+	$("swapStrikeBtn").classList.toggle("hidden", !isAdmin || isComplete() || isLone);
 	$("changeBowlerBtn").classList.toggle("hidden", !isAdmin || isComplete());
 	const changeBatBtn = $("changeBattersBtn");
 	if (changeBatBtn)
-		changeBatBtn.classList.toggle("hidden", !isAdmin || isComplete());
+		changeBatBtn.classList.toggle("hidden", !isAdmin || isComplete() || isLone);
 }
 let modalResolve = null;
 function modalKey(e) {
@@ -3119,11 +3149,17 @@ async function notifyPhaseChange(overDetails = null) {
 	}
 	if (state.innings === 2 && !(state.deliveries || []).length) {
 		const inn1 = state.innings_1 || {};
-		const inn1Team = bowlingTeamName();
+		const inn1Side = inn1.side || bowlingSide();
+		const inn1Team = inn1.team || bowlingTeamName();
 		const inn2Team = battingTeamName();
+		const inn1MaxW = maxWicketsForSide(inn1Side);
+		const isInn1AllOut = (inn1.wickets || 0) >= inn1MaxW;
+		const inn1Summary = isInn1AllOut
+			? `${inn1Team} all out for ${inn1.total || 0} (${inn1.wickets} wkts) in ${oversText(inn1.legal || 0)} overs.`
+			: `${inn1Team} scored ${inn1.total || 0}/${inn1.wickets || 0} in ${oversText(inn1.legal || 0)} overs.`;
 		await showModal({
-			title: "1st Innings Complete",
-			message: `${inn1Team} scored ${inn1.total || 0}/${inn1.wickets || 0} in ${oversText(inn1.legal || 0)} overs.\nTarget for ${inn2Team} is ${state.target} runs. Ready to start 2nd innings?`,
+			title: isInn1AllOut ? "1st Innings Complete (All Out)" : "1st Innings Complete",
+			message: `${inn1Summary}\nTarget for ${inn2Team} is ${state.target} runs. Ready to start 2nd innings?`,
 			confirmLabel: "Select Innings 2 Openers",
 			showCancel: false,
 			balls: overDetails ? overDetails.balls : null,
@@ -3139,7 +3175,8 @@ async function openWicketDeliveryModal(extraType = "") {
 	await ensureCreaseInitialized();
 	const cr = state.crease || {};
 	const striker = cr.striker || "Striker";
-	const nonStriker = cr.non_striker || "Non-Striker";
+	const nonStriker = cr.non_striker || null;
+	const isCurrentlyLone = !nonStriker;
 
 	const bRoster = battingRoster();
 	const outSet = new Set(
@@ -3148,15 +3185,21 @@ async function openWicketDeliveryModal(extraType = "") {
 			.map((d) => String(d.dismissed_player || d.batter || d.striker)),
 	);
 	const unbatted = bRoster.filter(
-		(p) => p !== striker && p !== nonStriker && !outSet.has(p),
+		(p) => p !== striker && (!nonStriker || p !== nonStriker) && !outSet.has(p),
 	);
+
+	const currentWickets = (state.deliveries || []).filter((d) => d.wicket).length;
+	const maxW = maxWickets(state);
+
+	// Case 1: Final wicket (All Out) -> all wickets lost or lone batter dismissed
+	const isFinalWicket = currentWickets + 1 >= maxW || isCurrentlyLone;
+
+	// Case 2: Transition to lone batter -> this dismissal leaves 1 batter standing alone
+	const willBeLoneBatter = !isFinalWicket && unbatted.length === 0;
 
 	let dismissal = "bowled";
 	let dismissedPlayer = striker;
-	let nextBatter =
-		unbatted[0] ||
-		bRoster.find((p) => p !== striker && p !== nonStriker) ||
-		"Next Batter";
+	let nextBatter = !isFinalWicket && !willBeLoneBatter ? unbatted[0] || null : null;
 	let runs = 0;
 
 	const content = (container) => {
@@ -3180,11 +3223,16 @@ async function openWicketDeliveryModal(extraType = "") {
 		const selPlayer = document.createElement("select");
 		const optStriker = document.createElement("option");
 		optStriker.value = striker;
-		optStriker.textContent = `${striker} (Striker)`;
-		const optNon = document.createElement("option");
-		optNon.value = nonStriker;
-		optNon.textContent = `${nonStriker} (Non-Striker)`;
-		selPlayer.append(optStriker, optNon);
+		optStriker.textContent = isCurrentlyLone
+			? `${striker} (Lone Batter)`
+			: `${striker} (Striker)`;
+		selPlayer.append(optStriker);
+		if (nonStriker) {
+			const optNon = document.createElement("option");
+			optNon.value = nonStriker;
+			optNon.textContent = `${nonStriker} (Non-Striker)`;
+			selPlayer.append(optNon);
+		}
 		rowPlayer.append(selPlayer);
 
 		const rowRuns = document.createElement("div");
@@ -3201,31 +3249,50 @@ async function openWicketDeliveryModal(extraType = "") {
 
 		const rowNext = document.createElement("div");
 		rowNext.className = "modal-custom-row";
-		rowNext.innerHTML = `<label>Next Incoming Batter</label>`;
-		const selNext = document.createElement("select");
-		if (unbatted.length) {
+		if (isFinalWicket) {
+			rowNext.innerHTML = `
+				<div class="allout-alert" style="background:#fee2e2;color:#991b1b;border:1px solid #f87171;border-radius:8px;padding:10px 12px;font-size:0.9rem;font-weight:600;display:flex;align-items:center;gap:8px;width:100%;">
+					<span style="font-size:1.2rem;">⚠️</span>
+					<span>Final Wicket (${currentWickets + 1}/${maxW}) — All batters out. Innings will conclude immediately.</span>
+				</div>
+			`;
+		} else if (willBeLoneBatter) {
+			const loneName = dismissedPlayer === striker ? nonStriker : striker;
+			rowNext.innerHTML = `
+				<div class="lone-alert" style="background:#e0f2fe;color:#0369a1;border:1px solid #7dd3fc;border-radius:8px;padding:10px 12px;font-size:0.9rem;font-weight:600;display:flex;align-items:center;gap:8px;width:100%;">
+					<span style="font-size:1.2rem;">🏏</span>
+					<span>Last Batter Stands — <strong id="loneBatterNotice">${loneName}</strong> will continue batting alone!</span>
+				</div>
+			`;
+		} else {
+			rowNext.innerHTML = `<label>Next Incoming Batter</label>`;
+			const selNext = document.createElement("select");
 			unbatted.forEach((p) => {
 				const opt = document.createElement("option");
 				opt.value = p;
 				opt.textContent = p;
 				selNext.append(opt);
 			});
-		} else {
-			const opt = document.createElement("option");
-			opt.value = "";
-			opt.textContent = "No more unbatted players (All Out / Manual End)";
-			selNext.append(opt);
+			selNext.onchange = () => {
+				nextBatter = selNext.value;
+			};
+			rowNext.append(selNext);
 		}
-		rowNext.append(selNext);
 
 		function updateVisibility() {
 			const isRunOut = selDismissal.value === "run out";
-			selPlayer.disabled = !isRunOut;
+			selPlayer.disabled = !isRunOut || isCurrentlyLone;
 			if (!isRunOut) {
 				selPlayer.value = striker;
 				dismissedPlayer = striker;
 			}
 			rowRuns.classList.toggle("hidden", !isRunOut);
+			if (willBeLoneBatter) {
+				const loneEl = $("loneBatterNotice");
+				if (loneEl) {
+					loneEl.textContent = dismissedPlayer === striker ? nonStriker : striker;
+				}
+			}
 		}
 
 		selDismissal.onchange = () => {
@@ -3234,22 +3301,39 @@ async function openWicketDeliveryModal(extraType = "") {
 		};
 		selPlayer.onchange = () => {
 			dismissedPlayer = selPlayer.value;
+			if (willBeLoneBatter) {
+				const loneEl = $("loneBatterNotice");
+				if (loneEl) {
+					loneEl.textContent = dismissedPlayer === striker ? nonStriker : striker;
+				}
+			}
 		};
 		selRuns.onchange = () => {
 			runs = parseInt(selRuns.value, 10) || 0;
-		};
-		selNext.onchange = () => {
-			nextBatter = selNext.value;
 		};
 
 		updateVisibility();
 		container.append(rowDismissal, rowPlayer, rowRuns, rowNext);
 	};
 
+	let modalTitle = "Fall of Wicket";
+	let modalMsg = "Record wicket details and next incoming batter:";
+	let modalConfirm = "Record Wicket";
+
+	if (isFinalWicket) {
+		modalTitle = "Fall of Final Wicket (All Out)";
+		modalMsg = "Record final dismissal details to conclude the innings:";
+		modalConfirm = "Record Wicket (All Out)";
+	} else if (willBeLoneBatter) {
+		modalTitle = "Fall of Wicket — Lone Batter";
+		modalMsg = "Record wicket details. Remaining batter will continue batting alone:";
+		modalConfirm = "Record Wicket (Bat Alone)";
+	}
+
 	const ok = await showModal({
-		title: "Fall of Wicket",
-		message: "Record wicket details and next incoming batter:",
-		confirmLabel: "Record Wicket",
+		title: modalTitle,
+		message: modalMsg,
+		confirmLabel: modalConfirm,
 		showCancel: true,
 		customContent: content,
 	});
@@ -3274,7 +3358,7 @@ async function openWicketDeliveryModal(extraType = "") {
 		wicket: true,
 		dismissal,
 		dismissedPlayer,
-		nextBatter,
+		nextBatter: !isFinalWicket && !willBeLoneBatter ? nextBatter : null,
 	});
 }
 
@@ -3299,7 +3383,7 @@ async function recordBallWithRotation({
 		const bRoster = battingRoster();
 		const bowRoster = bowlingRoster();
 		let curStriker = cr.striker || bRoster[0] || "Player 1";
-		let curNonStriker = cr.non_striker || bRoster[1] || "Player 2";
+		let curNonStriker = cr.non_striker || null;
 		let curBowler = cr.bowler || bowRoster[0] || "Player 1";
 
 		const creaseBefore = {
@@ -3307,6 +3391,11 @@ async function recordBallWithRotation({
 			non_striker: curNonStriker,
 			bowler: curBowler,
 		};
+
+		const maxW = maxWickets(state);
+		const currentW = (state.deliveries || []).filter((d) => d.wicket).length;
+		const isCurrentlyLone = !curNonStriker;
+		const isAllOutWicket = wicket && (currentW + 1 >= maxW || isCurrentlyLone);
 
 		let nextStriker = curStriker;
 		let nextNonStriker = curNonStriker;
@@ -3322,24 +3411,34 @@ async function recordBallWithRotation({
 
 		if (wicket) {
 			const outPerson = dismissedPlayer || curStriker;
-			const incoming =
-				nextBatter ||
-				(outPerson === curStriker ? "Next Batter" : curNonStriker);
-
-			if (outPerson === curStriker) {
-				nextStriker = incoming;
-				nextNonStriker = curNonStriker;
+			if (isAllOutWicket) {
+				nextStriker = null;
+				nextNonStriker = null;
+			} else if (!nextBatter) {
+				// Lone batter transition: surviving batter bats alone!
+				const loneSurvivor = outPerson === curStriker ? curNonStriker : curStriker;
+				nextStriker = loneSurvivor;
+				nextNonStriker = null;
 			} else {
-				if (physicalRuns % 2 === 1) {
+				const incoming = nextBatter;
+				if (outPerson === curStriker) {
 					nextStriker = incoming;
-					nextNonStriker = curStriker;
+					nextNonStriker = curNonStriker;
 				} else {
-					nextStriker = curStriker;
-					nextNonStriker = incoming;
+					if (physicalRuns % 2 === 1) {
+						nextStriker = incoming;
+						nextNonStriker = curStriker;
+					} else {
+						nextStriker = curStriker;
+						nextNonStriker = incoming;
+					}
 				}
 			}
 		} else {
-			if (physicalRuns % 2 === 1) {
+			if (isCurrentlyLone) {
+				nextStriker = curStriker;
+				nextNonStriker = null;
+			} else if (physicalRuns % 2 === 1) {
 				nextStriker = curNonStriker;
 				nextNonStriker = curStriker;
 			}
@@ -3349,17 +3448,19 @@ async function recordBallWithRotation({
 		const currentLegal = (legalCount(prev) % 6) + (isLegal ? 1 : 0);
 		const overEnded = isLegal && currentLegal === 6;
 
-		if (overEnded) {
+		if (overEnded && !isAllOutWicket && nextNonStriker) {
 			const t = nextStriker;
 			nextStriker = nextNonStriker;
 			nextNonStriker = t;
 		}
 
-		const creaseAfter = {
-			striker: nextStriker,
-			non_striker: nextNonStriker,
-			bowler: curBowler,
-		};
+		const creaseAfter = isAllOutWicket
+			? null
+			: {
+					striker: nextStriker,
+					non_striker: nextNonStriker,
+					bowler: curBowler,
+			  };
 
 		const d = {
 			runs,
@@ -3368,7 +3469,7 @@ async function recordBallWithRotation({
 			wicket,
 			dismissal: wicket ? dismissal || "bowled" : "",
 			dismissed_player: wicket ? dismissedPlayer || curStriker : null,
-			next_batter: wicket ? nextBatter : null,
+			next_batter: wicket && !isAllOutWicket ? nextBatter : null,
 			batter: curStriker,
 			bowler: curBowler,
 			striker: curStriker,
@@ -3385,7 +3486,7 @@ async function recordBallWithRotation({
 		);
 		const closed = overJustClosed(prev, r.state);
 		state = r.state;
-		if (state.innings === prevInnings) {
+		if (state.innings === prevInnings && !isComplete()) {
 			state.crease = creaseAfter;
 		} else {
 			state.crease = null;
@@ -3415,7 +3516,7 @@ async function recordBallWithRotation({
 			await notifyPhaseChange(
 				endedOverNum ? { balls: overBalls, overNumber: endedOverNum } : null,
 			);
-		} else if (closed) {
+		} else if (closed && !isComplete()) {
 			await notifyOverComplete(closed, endedOverBalls(closed, r.state));
 			await chooseNextBowlerModal(curBowler);
 		} else {
@@ -3510,7 +3611,7 @@ document
 $("swapStrikeBtn").onclick = async () => {
 	if (!isAdmin || !current || !state || isComplete()) return;
 	await ensureCreaseInitialized();
-	if (!state.crease) return;
+	if (!state.crease || !state.crease.non_striker) return;
 	const s = state.crease.striker;
 	const ns = state.crease.non_striker;
 	state.crease.striker = ns;

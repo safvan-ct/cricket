@@ -587,6 +587,10 @@ function battingPlayers(array $s): int
   if ($side === 'B') return max(2, (int)($s['players_b'] ?? $s['players'] ?? 7));
   return max(2, (int)($s['players_a'] ?? $s['players'] ?? 7));
 }
+function maxWicketsFor(array $s): int
+{
+  return battingPlayers($s);
+}
 function inningsStats(array $deliveries): array
 {
   $total = 0;
@@ -636,7 +640,7 @@ function resultFor(array $s, array $inn2): array
   $firstName = teamName($s, $first);
   $target = (int)($s['target'] ?? ($t1 + 1));
   if ($t2 >= $target) {
-    $remain = max(0, battingPlayers($s) - (int)$inn2['wickets']);
+    $remain = max(0, maxWicketsFor($s) - (int)$inn2['wickets']);
     $wk = $remain === 1 ? 'wicket' : 'wickets';
     return ['winner' => $chaseName, 'text' => $chaseName . ' won by ' . $remain . ' ' . $wk];
   }
@@ -651,6 +655,7 @@ function completeMatch(array &$s): void
   $s['innings_2'] = snapshotInnings($s, $stats);
   $s['result'] = resultFor($s, $s['innings_2']);
   $s['status'] = 'complete';
+  $s['crease'] = null;
 }
 function markCompleted(array &$s): void
 {
@@ -671,7 +676,8 @@ function inningsShouldClose(array $s): bool
   $stats = inningsStats($s['deliveries'] ?? []);
   $oversDone = $stats['legal'] >= ((int)$s['overs_limit']) * 6;
   $chased = ((int)($s['innings'] ?? 1) === 2) && isset($s['target']) && $stats['total'] >= (int)$s['target'];
-  return $oversDone || $chased;
+  $allOut = $stats['w'] >= maxWicketsFor($s);
+  return $oversDone || $chased || $allOut;
 }
 function applyAutoClose(array &$s): void
 {
@@ -787,6 +793,10 @@ if ($action === 'set_crease') {
     $pdo->rollBack();
     respond(['error' => 'Match is complete'], 422);
   }
+  if (inningsShouldClose($s)) {
+    $pdo->rollBack();
+    respond(['error' => 'Current innings is already finished'], 422);
+  }
   $crease = [
     'striker' => trim((string)($b['striker'] ?? '')),
     'non_striker' => trim((string)($b['non_striker'] ?? '')),
@@ -810,6 +820,10 @@ if ($action === 'delivery') {
   if (($s['status'] ?? '') === 'complete') {
     $pdo->rollBack();
     respond(['error' => 'Match is complete'], 422);
+  }
+  if (inningsShouldClose($s)) {
+    $pdo->rollBack();
+    respond(['error' => 'Current innings is already finished'], 422);
   }
   $d = $b['delivery'] ?? [];
   $allowed = [
