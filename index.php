@@ -124,10 +124,12 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
       </div>
 
       <div id="setupView" class="panel hidden">
-        <div class="section-head">
-          <h2 id="setupTitle">Create match</h2>
-          <button class="ghost" id="cancelSetup" style="margin-bottom:12px">Cancel</button>
+        <h2 id="setupTitle">Create match</h2>
+        <div class="setup-actions">
+          <button type="button" class="ghost" id="importPrevMatch">Import previous match</button>
+          <button type="button" class="ghost" id="cancelSetup">Cancel</button>
         </div>
+        <div id="importMatchNotice" class="import-notice hidden"></div>
 
         <form id="setupForm" class="form-stack">
           <div class="team-block">

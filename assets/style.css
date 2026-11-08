@@ -231,6 +231,54 @@ button {
     color: #fff
 }
 
+#setupView h2 {
+    margin-bottom: 12px;
+}
+
+.setup-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    margin-bottom: 14px;
+}
+
+.setup-actions button {
+    margin: 0;
+}
+
+#cancelSetup {
+    margin-left: auto;
+}
+
+.import-notice {
+    background: #eaf3fd;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 10px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--blue);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.import-notice button.link-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--blue);
+    text-decoration: underline;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
 /* Form layouts */
 .form-stack {
     display: flex;

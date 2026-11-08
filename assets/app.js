@@ -566,6 +566,10 @@ function fillSetup(mode) {
 		? "Update match info"
 		: "Create match";
 	$("setupSubmit").textContent = editingMatch ? "Save" : "Create match";
+	const importBtn = $("importPrevMatch");
+	if (importBtn) importBtn.classList.toggle("hidden", editingMatch);
+	const notice = $("importMatchNotice");
+	if (notice) notice.classList.add("hidden");
 	if (!editingMatch) {
 		$("teamA").value = "PAREL";
 		$("teamB").value = "BNA";
@@ -607,6 +611,168 @@ function fillSetup(mode) {
 	$("app").classList.remove("hidden");
 	headerMode();
 }
+
+function applyImportedMatch(prev) {
+	if (!prev) return;
+	// 1. Team names
+	$("teamA").value = prev.team_a || "";
+	$("teamB").value = prev.team_b || "";
+
+	// 2. Number of players
+	const pA = Math.max(2, Math.min(15, parseInt(prev.players_a || prev.players || 7, 10)));
+	const pB = Math.max(2, Math.min(15, parseInt(prev.players_b || prev.players || 7, 10)));
+	$("playersA").value = pA;
+	$("playersB").value = pB;
+
+	// 3. Selected players
+	selectedRosterA = [...(prev.roster_a || [])].slice(0, pA);
+	selectedRosterB = [...(prev.roster_b || [])].slice(0, pB);
+
+	// 4. Over count
+	$("overs").value = prev.overs_limit || 6;
+
+	// 5. Toss (who bats first)
+	const first = prev.batting_first === "B" ? "B" : "A";
+	const tossRadio = document.querySelector('input[name="batting"][value="' + first + '"]');
+	if (tossRadio) tossRadio.checked = true;
+
+	syncTossPills();
+	poolSearchA = "";
+	poolSearchB = "";
+	if ($("playerSearchA")) $("playerSearchA").value = "";
+	if ($("playerSearchB")) $("playerSearchB").value = "";
+	renderRosterChips();
+}
+
+async function importPreviousMatch() {
+	if (!isAdmin) return;
+	try {
+		const r = await api("list");
+		const matches = (r && r.matches) || [];
+		if (!matches.length) {
+			showError("No previous match found to import.");
+			return;
+		}
+
+		const latest = matches[0];
+		const s = latest.state || {};
+		applyImportedMatch(s);
+
+		const notice = $("importMatchNotice");
+		if (notice) {
+			const teamText = `${s.team_a || "Team A"} vs ${s.team_b || "Team B"}`;
+			const tossTeam = s.batting_first === "B" ? (s.team_b || "Team B") : (s.team_a || "Team A");
+			const pCountA = s.players_a || s.players || 7;
+			const pCountB = s.players_b || s.players || 7;
+			const detailsText = `${pCountA}v${pCountB} · ${s.overs_limit || 6} Ov · Toss: ${tossTeam}`;
+			notice.innerHTML = `
+				<span>✓ Imported previous match: <strong>${teamText}</strong> (${detailsText})</span>
+				${matches.length > 1 ? '<button type="button" class="link-btn" id="chooseDiffMatchBtn">Choose different</button>' : ""}
+			`;
+			notice.classList.remove("hidden");
+			const chooseBtn = $("chooseDiffMatchBtn");
+			if (chooseBtn) {
+				chooseBtn.onclick = () => showMatchPickerModal(matches);
+			}
+		}
+	} catch (e) {
+		showError(e.message || "Failed to import previous match.");
+	}
+}
+
+async function showMatchPickerModal(matches) {
+	let selectedIndex = 0;
+	const customContent = (container) => {
+		const wrap = document.createElement("div");
+		wrap.style.cssText = "display:flex;flex-direction:column;gap:12px;text-align:left;";
+
+		const lbl = document.createElement("label");
+		lbl.style.cssText = "font-size:12px;font-weight:700;color:#3a5a7a;";
+		lbl.textContent = "Select previous match to import:";
+
+		const sel = document.createElement("select");
+		sel.style.cssText = "width:100%;padding:10px 12px;border:1px solid #b0ccdf;border-radius:9px;font:inherit;";
+		matches.forEach((m, idx) => {
+			const st = m.state || {};
+			const opt = document.createElement("option");
+			opt.value = idx;
+			const tA = st.team_a || "Team A";
+			const tB = st.team_b || "Team B";
+			const ov = st.overs_limit || 6;
+			const pA = st.players_a || st.players || 7;
+			const pB = st.players_b || st.players || 7;
+			const date = matchDayLabel(matchDayKey(m));
+			opt.textContent = `${tA} vs ${tB} (${pA}v${pB}, ${ov} Ov) · ${date}${idx === 0 ? " (Latest)" : ""}`;
+			sel.append(opt);
+		});
+
+		const previewBox = document.createElement("div");
+		previewBox.style.cssText = "background:#f0f7ff;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:12px;display:flex;flex-direction:column;gap:6px;";
+
+		function updatePreview() {
+			const m = matches[selectedIndex];
+			const st = (m && m.state) || {};
+			const tA = st.team_a || "Team A";
+			const tB = st.team_b || "Team B";
+			const pA = st.players_a || st.players || 7;
+			const pB = st.players_b || st.players || 7;
+			const rA = (st.roster_a || []).join(", ") || "None";
+			const rB = (st.roster_b || []).join(", ") || "None";
+			const tossTeam = st.batting_first === "B" ? tB : tA;
+			previewBox.innerHTML = `
+				<div><strong>Teams:</strong> ${tA} vs ${tB}</div>
+				<div><strong>Players:</strong> ${pA} (${tA}) · ${pB} (${tB})</div>
+				<div><strong>Overs:</strong> ${st.overs_limit || 6} overs per innings</div>
+				<div><strong>Toss:</strong> ${tossTeam} bats first</div>
+				<div style="color:var(--muted);margin-top:4px;"><strong>${tA} Roster:</strong> ${rA}</div>
+				<div style="color:var(--muted);"><strong>${tB} Roster:</strong> ${rB}</div>
+			`;
+		}
+
+		sel.onchange = () => {
+			selectedIndex = parseInt(sel.value, 10) || 0;
+			updatePreview();
+		};
+
+		updatePreview();
+		wrap.append(lbl, sel, previewBox);
+		container.append(wrap);
+	};
+
+	const ok = await showModal({
+		title: "Import Match Info",
+		message: "Choose which previous match to copy into this new match:",
+		confirmLabel: "Import Selected",
+		showCancel: true,
+		showClose: true,
+		customContent,
+	});
+
+	if (ok) {
+		const m = matches[selectedIndex];
+		if (m && m.state) {
+			applyImportedMatch(m.state);
+			const notice = $("importMatchNotice");
+			if (notice) {
+				const s = m.state;
+				const teamText = `${s.team_a || "Team A"} vs ${s.team_b || "Team B"}`;
+				const tossTeam = s.batting_first === "B" ? (s.team_b || "Team B") : (s.team_a || "Team A");
+				const pCountA = s.players_a || s.players || 7;
+				const pCountB = s.players_b || s.players || 7;
+				const detailsText = `${pCountA}v${pCountB} · ${s.overs_limit || 6} Ov · Toss: ${tossTeam}`;
+				notice.innerHTML = `
+					<span>✓ Imported match: <strong>${teamText}</strong> (${detailsText})</span>
+					${matches.length > 1 ? '<button type="button" class="link-btn" id="chooseDiffMatchBtn">Change</button>' : ""}
+				`;
+				notice.classList.remove("hidden");
+				const chooseBtn = $("chooseDiffMatchBtn");
+				if (chooseBtn) {
+					chooseBtn.onclick = () => showMatchPickerModal(matches);
+				}
+			}
+		}
+	}
+}
 $("playersA").addEventListener("input", () => {
 	renderRosterChips();
 });
@@ -628,7 +794,13 @@ $("updateMatch").onclick = async () => {
 	pushNavState({ page: "setup", mode: "update", matchId: current }, "#setup");
 	fillSetup("update");
 };
+const importPrevBtn = $("importPrevMatch");
+if (importPrevBtn) {
+	importPrevBtn.onclick = importPreviousMatch;
+}
 $("cancelSetup").onclick = () => {
+	const notice = $("importMatchNotice");
+	if (notice) notice.classList.add("hidden");
 	if (history.state && history.state.page === "setup") {
 		history.back();
 		return;
@@ -658,6 +830,8 @@ $("teamB").addEventListener("input", syncTossPills);
 
 $("setupForm").onsubmit = async (e) => {
 	e.preventDefault();
+	const notice = $("importMatchNotice");
+	if (notice) notice.classList.add("hidden");
 	try {
 		const batting = document.querySelector(
 			'input[name="batting"]:checked',
@@ -2508,7 +2682,7 @@ function setScoreTab(tab) {
 	activeScoreTab = tab;
 	if (current && !isNavigatingHistory) {
 		const tabHash = tab === "scorecard" ? "&tab=scorecard" : "";
-		pushNavState({ page: "match", matchId: current, tab }, "#m=" + current + tabHash);
+		pushNavState({ page: "match", matchId: current, tab }, "#m=" + current + tabHash, true);
 	}
 	render();
 }
@@ -3856,15 +4030,7 @@ $("modal").onclick = (e) => {
 		closeModal(false);
 };
 const tabLive = $("tabLive");
-if (tabLive) {
-	tabLive.onclick = () => {
-		if (activeScoreTab === "scorecard" && history.state && history.state.tab === "scorecard") {
-			history.back();
-		} else {
-			setScoreTab("live");
-		}
-	};
-}
+if (tabLive) tabLive.onclick = () => setScoreTab("live");
 const tabScorecard = $("tabScorecard");
 if (tabScorecard) tabScorecard.onclick = () => setScoreTab("scorecard");
 
