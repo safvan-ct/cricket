@@ -933,7 +933,7 @@ if ($action === 'delivery') {
   $item['extra_runs'] = max(0, min(10, (int)$item['extra_runs']));
   $item['wicket'] = !empty($item['wicket']);
   $item['created'] = date('c');
-  if (!in_array($item['extra_type'], ['', 'wide', 'no-ball', 'bye', 'overthrow'], true)) {
+  if (!in_array($item['extra_type'], ['', 'wide', 'no-ball', 'bye', 'leg-bye', 'penalty', 'overthrow'], true)) {
     $pdo->rollBack();
     respond(['error' => 'Invalid extra type'], 422);
   }
