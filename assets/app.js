@@ -246,7 +246,7 @@ function renderRosterChips() {
 	if (selA) {
 		selA.innerHTML = "";
 		if (!selectedRosterA.length) {
-			selA.innerHTML = '<span class="hint" style="margin:2px 4px;font-size:11px">No players selected. Tap from pool below or type name.</span>';
+			selA.innerHTML = '<span class="hint" style="margin:2px 4px;font-size:11px">No players selected. Tap from pool below.</span>';
 		} else {
 			selectedRosterA.forEach((name, idx) => {
 				const chip = document.createElement("span");
@@ -336,7 +336,7 @@ function renderRosterChips() {
 	if (selB) {
 		selB.innerHTML = "";
 		if (!selectedRosterB.length) {
-			selB.innerHTML = '<span class="hint" style="margin:2px 4px;font-size:11px">No players selected. Tap from pool below or type name.</span>';
+			selB.innerHTML = '<span class="hint" style="margin:2px 4px;font-size:11px">No players selected. Tap from pool below.</span>';
 		} else {
 			selectedRosterB.forEach((name, idx) => {
 				const chip = document.createElement("span");

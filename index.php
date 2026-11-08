@@ -131,8 +131,10 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
 
         <form id="setupForm" class="form-stack">
           <div class="team-block">
-            <label>Team A name<input id="teamA" required value="PAREL"></label>
-            <label>Number of players<input id="playersA" type="number" min="2" max="15" value="7" required></label>
+            <div class="team-inputs-row">
+              <label class="team-name-col">Team A name<input id="teamA" required value="PAREL"></label>
+              <label class="team-players-col">Players<input id="playersA" type="number" min="2" max="15" value="7" required></label>
+            </div>
             <div id="rosterAWrap" class="roster-wrap">
               <div class="roster-header-row">
                 <span class="subhead roster-title">Team A Players (<span id="countA">0</span>/<span id="maxA">7</span>)</span>
@@ -151,8 +153,10 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
           </div>
 
           <div class="team-block">
-            <label>Team B name<input id="teamB" required value="BNA"></label>
-            <label>Number of players<input id="playersB" type="number" min="2" max="15" value="7" required></label>
+            <div class="team-inputs-row">
+              <label class="team-name-col">Team B name<input id="teamB" required value="BNA"></label>
+              <label class="team-players-col">Players<input id="playersB" type="number" min="2" max="15" value="7" required></label>
+            </div>
             <div id="rosterBWrap" class="roster-wrap">
               <div class="roster-header-row">
                 <span class="subhead roster-title">Team B Players (<span id="countB">0</span>/<span id="maxB">7</span>)</span>
