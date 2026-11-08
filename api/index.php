@@ -126,6 +126,7 @@ function cleanRoster(mixed $raw, int $count, string $prefix = 'Player'): array
   for ($i = 1; $i <= $count; $i++) {
     $idx = $i - 1;
     $val = isset($list[$idx]) ? trim((string)$list[$idx]) : '';
+    $val = normalizePlayerName($val);
     $out[] = $val !== '' ? $val : ($prefix . ' ' . $i);
   }
   return $out;
@@ -141,20 +142,24 @@ function ensurePlayersTable(PDO $pdo): void
 {
   static $checked = false;
   if ($checked) return;
-  $pdo->exec("CREATE TABLE IF NOT EXISTS players (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE,
-    role VARCHAR(50) DEFAULT 'All-Rounder',
-    is_active TINYINT(1) NOT NULL DEFAULT 1,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+  if ($pdo->inTransaction()) return;
 
   try {
-    $pdo->exec("ALTER TABLE players ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1");
-  } catch (PDOException $e) {}
+    $pdo->exec("CREATE TABLE IF NOT EXISTS players (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(100) NOT NULL UNIQUE,
+      role VARCHAR(50) DEFAULT 'All-Rounder',
+      is_active TINYINT(1) NOT NULL DEFAULT 1,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
-  $checked = true;
+    try {
+      $pdo->exec("ALTER TABLE players ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1");
+    } catch (PDOException $e) {}
+
+    $checked = true;
+  } catch (PDOException $e) {}
 }
 
 function registerRosterPlayers(PDO $pdo, array $names): void
@@ -174,12 +179,20 @@ function normalizePlayerName(mixed $val): string
   $v = trim((string)$val);
   if ($v === '') return '';
   if (is_numeric($v)) return 'Player ' . $v;
-  return $v;
+  if (preg_match('/^(.*?)\s*\((.*?)\)$/u', $v, $m)) {
+    $base = normalizePlayerName($m[1]);
+    $tag = trim($m[2]);
+    return $base . ' (' . $tag . ')';
+  }
+  $lower = mb_strtolower($v, 'UTF-8');
+  return preg_replace_callback('/(^|[\s\-\.\/\'])([a-z])/u', function ($m) {
+    return $m[1] . strtoupper($m[2]);
+  }, $lower);
 }
 
 function initPlayerStatsRow(mixed $name, int $id = 0, int $isActive = 1): array
 {
-  $name = (string)$name;
+  $name = normalizePlayerName($name);
   return [
     'id' => $id,
     'name' => $name,
@@ -513,6 +526,10 @@ if ($action === 'list') respond(['matches' => allMatches($pdo)]);
 if ($action === 'players') {
   ensurePlayersTable($pdo);
   $rows = $pdo->query('SELECT id, name, is_active, created_at FROM players ORDER BY name ASC')->fetchAll();
+  foreach ($rows as &$row) {
+    $row['name'] = normalizePlayerName($row['name']);
+  }
+  unset($row);
   respond(['players' => $rows]);
 }
 if ($action === 'player_create') {
@@ -522,7 +539,7 @@ if ($action === 'player_create') {
   $tag = trim((string)($b['tag'] ?? ''));
   if ($rawName === '') respond(['error' => 'Player name is required'], 422);
 
-  $name = $rawName;
+  $name = normalizePlayerName($rawName);
   if ($tag !== '') {
     if (!preg_match('/\(' . preg_quote($tag, '/') . '\)$/', $name)) {
       $name = rtrim(preg_replace('/\s*\(.*?\)$/', '', $name)) . ' (' . $tag . ')';
@@ -547,7 +564,7 @@ if ($action === 'player_update') {
   $tag = trim((string)($b['tag'] ?? ''));
   if ($pId <= 0 || $rawName === '') respond(['error' => 'Valid ID and name required'], 422);
 
-  $name = $rawName;
+  $name = normalizePlayerName($rawName);
   if ($tag !== '') {
     if (!preg_match('/\(' . preg_quote($tag, '/') . '\)$/', $name)) {
       $name = rtrim(preg_replace('/\s*\(.*?\)$/', '', $name)) . ' (' . $tag . ')';
@@ -594,12 +611,17 @@ if ($action === 'player_toggle_active') {
 }
 if ($action === 'player_stats') {
   $target = isset($_GET['name']) ? trim((string)$_GET['name']) : null;
+  if ($target !== null && $target !== '') {
+    $target = normalizePlayerName($target);
+  }
   $allStats = computeAllPlayerStats($pdo, $target);
   $leaderboards = getLeaderboards($allStats);
   if ($target !== null && $target !== '') {
     $playerData = $allStats[$target] ?? null;
     if (!$playerData) {
       $playerData = initPlayerStatsRow($target);
+    } else {
+      $playerData['name'] = normalizePlayerName($playerData['name']);
     }
     respond(['ok' => true, 'player' => $playerData, 'leaderboards' => $leaderboards]);
   }
@@ -848,8 +870,10 @@ if ($action === 'update') {
   saveMatch($pdo, $id, $s);
   $st = $pdo->prepare('UPDATE matches SET title=? WHERE id=?');
   $st->execute([$title, $id]);
+  if ($pdo->inTransaction()) {
+    $pdo->commit();
+  }
   registerRosterPlayers($pdo, array_merge($s['roster_a'], $s['roster_b']));
-  $pdo->commit();
   respond(['ok' => true, 'title' => $title, 'state' => $s]);
 }
 if ($action === 'set_crease') {

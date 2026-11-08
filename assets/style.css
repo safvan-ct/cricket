@@ -2355,3 +2355,18 @@ td:first-child {
     cursor: not-allowed;
     background: #f5f5f5
 }
+
+/* Capitalize player names all over the app */
+.player-name,
+.sc-player-name,
+.sel-chip-name,
+.pool-chip,
+.lb-name,
+.career-hero h2,
+.player-stats-table td.sc-col-player strong,
+.sc-fow-chips,
+.sc-dnb-list,
+.sc-dismissal,
+.app-select option {
+    text-transform: capitalize;
+}

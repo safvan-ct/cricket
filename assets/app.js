@@ -15,6 +15,21 @@ const EXTRA_LABELS = {
 	overthrow: "Ovr 4",
 	wicket: "Wicket",
 };
+function formatPlayerName(name) {
+	if (!name || typeof name !== "string") return "";
+	const trimmed = name.trim();
+	if (!trimmed) return "";
+	if (/^\d+$/.test(trimmed)) return "Player " + trimmed;
+	const tagMatch = trimmed.match(/^(.*?)\s*\((.*?)\)$/);
+	if (tagMatch) {
+		const base = formatPlayerName(tagMatch[1]);
+		const tag = tagMatch[2].trim();
+		return `${base} (${tag})`;
+	}
+	return trimmed
+		.toLowerCase()
+		.replace(/(^|[\s\-\.\/'])([a-z])/g, (_, p1, p2) => p1 + p2.toUpperCase());
+}
 async function api(action, method = "GET", data = null, id = null) {
 	const url = "api/index.php?action=" + action + (id ? "&id=" + id : "");
 	const r = await fetch(url, {
@@ -304,7 +319,7 @@ async function loadCommonPlayers() {
 		const r = await api("players");
 		commonPlayers = (r.players || [])
 			.filter((p) => p.is_active === undefined || Number(p.is_active) === 1)
-			.map((p) => p.name);
+			.map((p) => formatPlayerName(typeof p === "string" ? p : p.name));
 	} catch (e) {
 		commonPlayers = [];
 	}
@@ -501,7 +516,7 @@ async function handleAddChipInput(side) {
 	const other = side === "A" ? selectedRosterB : selectedRosterA;
 
 	const existingMatch = commonPlayers.find((p) => p.toLowerCase() === name.toLowerCase());
-	const finalName = existingMatch || name;
+	const finalName = formatPlayerName(existingMatch || name);
 
 	if (current.some((p) => p.toLowerCase() === finalName.toLowerCase())) {
 		showError(`${finalName} is already in Team ${side}.`);
@@ -586,8 +601,8 @@ function fillSetup(mode) {
 		document.querySelector(
 			'input[name="batting"][value="' + first + '"]',
 		).checked = true;
-		selectedRosterA = [...(state.roster_a || [])];
-		selectedRosterB = [...(state.roster_b || [])];
+		selectedRosterA = (state.roster_a || []).map(formatPlayerName);
+		selectedRosterB = (state.roster_b || []).map(formatPlayerName);
 	}
 	const lock = editingMatch && matchStarted();
 	document.querySelectorAll('input[name="batting"]').forEach((el) => {
@@ -621,8 +636,8 @@ function applyImportedMatch(prev) {
 	$("playersB").value = pB;
 
 	// 3. Selected players
-	selectedRosterA = [...(prev.roster_a || [])].slice(0, pA);
-	selectedRosterB = [...(prev.roster_b || [])].slice(0, pB);
+	selectedRosterA = (prev.roster_a || []).map(formatPlayerName).slice(0, pA);
+	selectedRosterB = (prev.roster_b || []).map(formatPlayerName).slice(0, pB);
 
 	// 4. Over count
 	$("overs").value = prev.overs_limit || 6;
@@ -849,9 +864,8 @@ $("setupForm").onsubmit = async (e) => {
 	const notice = $("importMatchNotice");
 	if (notice) notice.classList.add("hidden");
 	try {
-		const batting = document.querySelector(
-			'input[name="batting"]:checked',
-		).value;
+		const tossChecked = document.querySelector('input[name="batting"]:checked');
+		const batting = tossChecked ? tossChecked.value : (state && state.batting_first) || "A";
 		const maxA = Math.max(2, Math.min(15, parseInt($("playersA").value, 10) || 7));
 		const maxB = Math.max(2, Math.min(15, parseInt($("playersB").value, 10) || 7));
 
@@ -878,7 +892,7 @@ $("setupForm").onsubmit = async (e) => {
 			players_b: maxB,
 			roster_a: finalRosterA,
 			roster_b: finalRosterB,
-			overs: $("overs").value,
+			overs: parseInt($("overs").value, 10) || 6,
 			batting_first: batting,
 		};
 		if (editingMatch && current) {
@@ -1157,7 +1171,7 @@ function renderLeaderboards(lb) {
 				rank.textContent = idx + 1;
 				const name = document.createElement("span");
 				name.className = "lb-name";
-				name.textContent = p.name;
+				name.textContent = formatPlayerName(p.name);
 				left.append(rank, name);
 
 				const val = document.createElement("span");
@@ -1214,7 +1228,7 @@ function renderPlayerDirectory(stats, filterQuery = "") {
 		tr.onclick = () => showPlayerCareerModal(p.name);
 		const isInactive = p.is_active !== undefined && Number(p.is_active) === 0;
 		tr.innerHTML = `
-			<td class="sc-col-player"><strong>${esc(p.name)}</strong>${isInactive ? ' <span class="badge-inactive">Inactive</span>' : ""}</td>
+			<td class="sc-col-player"><strong>${esc(formatPlayerName(p.name))}</strong>${isInactive ? ' <span class="badge-inactive">Inactive</span>' : ""}</td>
 			<td class="sc-num">${p.matches}</td>
 			<td class="sc-num"><strong>${b.runs}</strong></td>
 			<td class="sc-num">${b.hs_display}</td>
@@ -1302,7 +1316,7 @@ async function showPlayerCareerModal(playerName) {
 					<h3 class="career-modal-title">Player Profile</h3>
 				</div>
 				<div class="career-hero">
-					<h2>${esc(p.name)} <span id="careerStatusBadge" class="player-status-badge ${Number(p.is_active) === 0 ? "inactive" : "active"}">${Number(p.is_active) === 0 ? "Inactive" : "Active"}</span></h2>
+					<h2>${esc(formatPlayerName(p.name))} <span id="careerStatusBadge" class="player-status-badge ${Number(p.is_active) === 0 ? "inactive" : "active"}">${Number(p.is_active) === 0 ? "Inactive" : "Active"}</span></h2>
 					<p>${p.matches} Matches played across completed matches</p>
 				</div>
 			`;
@@ -1537,7 +1551,7 @@ async function showPlayerCareerModal(playerName) {
 					setTimeout(async () => {
 						const ok = await showModal({
 							title: "Delete Player",
-							message: `Are you sure you want to delete "${p.name}" from the player directory? (Past match scorecards remain preserved.)`,
+							message: `Are you sure you want to delete "${formatPlayerName(p.name)}" from the player directory? (Past match scorecards remain preserved.)`,
 							confirmLabel: "Delete Player",
 							showCancel: true,
 							showClose: true,
@@ -1587,12 +1601,12 @@ function parsePlayerNameAndTag(raw) {
 }
 
 function formatPlayerDisplayName(baseName, tag) {
-	baseName = (baseName || "").trim();
+	baseName = formatPlayerName(baseName || "");
 	tag = (tag || "").trim();
 	if (!tag) return baseName;
 	const m = baseName.match(/^(.*?)\s*\((.*?)\)$/);
 	if (m) {
-		return `${m[1].trim()} (${tag})`;
+		return `${formatPlayerName(m[1])} (${tag})`;
 	}
 	return `${baseName} (${tag})`;
 }
@@ -1759,7 +1773,7 @@ async function showAddPlayerModal(prefill = "") {
 }
 
 async function showRenamePlayerModal(p) {
-	const parsed = parsePlayerNameAndTag(p.name);
+	const parsed = parsePlayerNameAndTag(formatPlayerName(p.name));
 	let enteredName = parsed.baseName;
 	let enteredTag = parsed.tag;
 	let validationError = "";
@@ -1863,7 +1877,7 @@ async function showRenamePlayerModal(p) {
 
 		const ok = await showModal({
 			title: "Rename Player",
-			message: `Update player name for "${p.name}":`,
+			message: `Update player name for "${formatPlayerName(p.name)}":`,
 			confirmLabel: "Save Name",
 			showCancel: true,
 			showClose: true,
@@ -1929,7 +1943,7 @@ function teamRoster(side) {
 	const out = [];
 	for (let i = 1; i <= count; i++) {
 		const idx = i - 1;
-		out.push(list[idx] || "Player " + i);
+		out.push(formatPlayerName(list[idx] || "Player " + i));
 	}
 	return out;
 }
@@ -2142,8 +2156,11 @@ async function openInningsOpenerModal() {
 async function chooseNextBowlerModal(prevBowler, defaultBowler = null) {
 	if (!isAdmin || !current || isComplete()) return;
 	const roster = bowlingRoster();
-	const curBowler = defaultBowler || (state.crease && state.crease.bowler) || "";
-	let selected = (curBowler && curBowler !== prevBowler && roster.includes(curBowler))
+	const curBowler = defaultBowler
+		? formatPlayerName(defaultBowler)
+		: (state.crease && state.crease.bowler ? formatPlayerName(state.crease.bowler) : "");
+	const prevBowlerFormatted = prevBowler ? formatPlayerName(prevBowler) : "";
+	let selected = (curBowler && curBowler !== prevBowlerFormatted && roster.includes(curBowler))
 		? curBowler
 		: "";
 
@@ -2164,7 +2181,7 @@ async function chooseNextBowlerModal(prevBowler, defaultBowler = null) {
 		sel.append(defOpt);
 
 		roster.forEach((name) => {
-			const isPrev = name === prevBowler;
+			const isPrev = name === prevBowlerFormatted;
 			const opt = document.createElement("option");
 			opt.value = name;
 			opt.textContent = isPrev
@@ -2189,8 +2206,8 @@ async function chooseNextBowlerModal(prevBowler, defaultBowler = null) {
 
 	const ok = await showModal({
 		title: "Select Bowler",
-		message: prevBowler
-			? `${prevBowler} just completed the over. Choose the next bowler (cannot bowl consecutive overs):`
+		message: prevBowlerFormatted
+			? `${prevBowlerFormatted} just completed the over. Choose the next bowler (cannot bowl consecutive overs):`
 			: "Choose the active bowler:",
 		confirmLabel: "Confirm Bowler",
 		showCancel: false,
@@ -2224,18 +2241,20 @@ async function changeBattersModal() {
 	const outSet = new Set(
 		deliveries
 			.filter((d) => d.wicket)
-			.map((d) => String(d.dismissed_player || d.batter || d.striker)),
+			.map((d) => formatPlayerName(String(d.dismissed_player || d.batter || d.striker))),
 	);
 
 	const availableBatters = isStartOfInnings
 		? bRoster
 		: bRoster.filter((p) => !outSet.has(p));
 
-	let currentStriker = (cr.striker && availableBatters.includes(cr.striker))
-		? cr.striker
+	const fStriker = cr.striker ? formatPlayerName(cr.striker) : "";
+	const fNonStriker = cr.non_striker ? formatPlayerName(cr.non_striker) : "";
+	let currentStriker = (fStriker && availableBatters.includes(fStriker))
+		? fStriker
 		: "";
-	let currentNonStriker = (cr.non_striker && availableBatters.includes(cr.non_striker) && cr.non_striker !== currentStriker)
-		? cr.non_striker
+	let currentNonStriker = (fNonStriker && availableBatters.includes(fNonStriker) && fNonStriker !== currentStriker)
+		? fNonStriker
 		: "";
 
 	const content = (container) => {
@@ -2503,8 +2522,8 @@ function calc() {
 		bowl = {},
 		recent = [];
 	(state.deliveries || []).forEach((d) => {
-		const bat = String(d.batter || d.striker || 1),
-			bow = String(d.bowler || 1);
+		const bat = formatPlayerName(String(d.batter || d.striker || 1)),
+			bow = formatPlayerName(String(d.bowler || 1));
 		batBalls[bat] ??= { r: 0, b: 0, f: 0, s: 0, out: false, dismissal: "" };
 		bowl[bow] ??= { r: 0, w: 0, b: 0, maidens: 0 };
 		const isLegal = isLegalBall(d);
@@ -2516,9 +2535,9 @@ function calc() {
 		extraRuns += extraOnly;
 		if (d.wicket) {
 			w++;
-			const outPlayer = String(
+			const outPlayer = formatPlayerName(String(
 				d.dismissed_player || d.batter || d.striker || 1,
-			);
+			));
 			batBalls[outPlayer] ??= {
 				r: 0,
 				b: 0,
@@ -2546,7 +2565,7 @@ function calc() {
 	const overs = groupOvers(state.deliveries || []);
 	overs.forEach((ov) => {
 		if (ov.complete && ov.balls.length > 0) {
-			const b = String(ov.balls[0].bowler || 1);
+			const b = formatPlayerName(String(ov.balls[0].bowler || 1));
 			const r = overRuns(ov.balls);
 			if (r === 0) {
 				bowl[b] ??= { r: 0, w: 0, b: 0, maidens: 0 };
@@ -2687,7 +2706,11 @@ function appendOverSection(
 			h.className = "over-card-head";
 			const title = document.createElement("h3");
 			const bowlersInOver = [
-				...new Set((ov.balls || []).map((d) => d && d.bowler).filter(Boolean)),
+				...new Set(
+					(ov.balls || [])
+						.map((d) => (d && d.bowler ? formatPlayerName(d.bowler) : ""))
+						.filter(Boolean),
+				),
 			];
 			const bowlerName = bowlersInOver.length
 				? bowlersInOver.join(" / ")
@@ -2695,8 +2718,9 @@ function appendOverSection(
 						!ov.complete &&
 						state &&
 						state.crease &&
-						state.crease.bowler) ||
-					"";
+						state.crease.bowler
+						? formatPlayerName(state.crease.bowler)
+						: "") || "";
 			title.textContent = bowlerName
 				? `${bowlerName} (Over ${i + 1})${markCurrent && !ov.complete ? " · current" : ""}`
 				: `Over ${i + 1}${markCurrent && !ov.complete ? " · current" : ""}`;
@@ -2808,6 +2832,7 @@ function computeInningsScorecard(
 	bowRoster,
 	crease = null,
 	isLive = false,
+	openers = null,
 ) {
 	const batting = {};
 	const bowling = {};
@@ -2824,7 +2849,8 @@ function computeInningsScorecard(
 		total: 0,
 	};
 
-	(batRoster || []).forEach((name) => {
+	(batRoster || []).forEach((rawName) => {
+		const name = formatPlayerName(rawName);
 		batting[name] = {
 			name,
 			runs: 0,
@@ -2837,7 +2863,8 @@ function computeInningsScorecard(
 		};
 	});
 
-	(bowRoster || []).forEach((name) => {
+	(bowRoster || []).forEach((rawName) => {
+		const name = formatPlayerName(rawName);
 		bowling[name] = {
 			name,
 			balls: 0,
@@ -2850,10 +2877,21 @@ function computeInningsScorecard(
 		};
 	});
 
+	if (openers && (isLive || (deliveries && deliveries.length > 0))) {
+		const opS = formatPlayerName(openers.striker);
+		const opNs = formatPlayerName(openers.non_striker);
+		if (opS && batting[opS]) {
+			batting[opS].hasBatted = true;
+		}
+		if (opNs && batting[opNs]) {
+			batting[opNs].hasBatted = true;
+		}
+	}
+
 	(deliveries || []).forEach((d) => {
-		const bat = d.batter || d.striker;
-		const ns = d.non_striker;
-		const bow = d.bowler;
+		const bat = formatPlayerName(d.batter || d.striker);
+		const ns = formatPlayerName(d.non_striker);
+		const bow = formatPlayerName(d.bowler);
 		const isLegal = !["wide", "no-ball"].includes(d.extra_type || "");
 		const runs = d.runs || 0;
 		const exr = d.extra_runs || 0;
@@ -2905,7 +2943,7 @@ function computeInningsScorecard(
 
 		if (d.wicket) {
 			totalWickets++;
-			const outPerson = d.dismissed_player || bat;
+			const outPerson = formatPlayerName(d.dismissed_player || d.batter || d.striker);
 			if (batting[outPerson]) {
 				batting[outPerson].hasBatted = true;
 				batting[outPerson].isOut = true;
@@ -2926,6 +2964,10 @@ function computeInningsScorecard(
 					batting[outPerson].dismissal = `${dis} b ${bow}`;
 				}
 			}
+			const nextB = formatPlayerName(d.next_batter);
+			if (nextB && batting[nextB]) {
+				batting[nextB].hasBatted = true;
+			}
 			if (bowling[bow] && !["run out", "retired hurt"].includes(d.dismissal)) {
 				bowling[bow].wickets++;
 			}
@@ -2939,19 +2981,84 @@ function computeInningsScorecard(
 	});
 
 	if (isLive && crease) {
-		if (crease.striker && batting[crease.striker]) {
-			batting[crease.striker].hasBatted = true;
-			if (!batting[crease.striker].isOut) {
-				batting[crease.striker].dismissal = "batting";
+		const crS = formatPlayerName(crease.striker);
+		const crNs = formatPlayerName(crease.non_striker);
+		if (crS && batting[crS]) {
+			batting[crS].hasBatted = true;
+			if (!batting[crS].isOut) {
+				batting[crS].dismissal = "batting";
 			}
 		}
-		if (crease.non_striker && batting[crease.non_striker]) {
-			batting[crease.non_striker].hasBatted = true;
-			if (!batting[crease.non_striker].isOut) {
-				batting[crease.non_striker].dismissal = "not out";
+		if (crNs && batting[crNs]) {
+			batting[crNs].hasBatted = true;
+			if (!batting[crNs].isOut) {
+				batting[crNs].dismissal = "not out";
 			}
 		}
 	}
+
+	const battingOrder = [];
+	const seenBatters = new Set();
+	const addBatter = (name) => {
+		const formatted = formatPlayerName(name);
+		if (!formatted || seenBatters.has(formatted)) return;
+		if (batting[formatted] && batting[formatted].hasBatted) {
+			seenBatters.add(formatted);
+			battingOrder.push(formatted);
+		}
+	};
+
+	if (openers) {
+		addBatter(openers.striker);
+		addBatter(openers.non_striker);
+	}
+
+	(deliveries || []).forEach((d) => {
+		const s = d.striker || d.batter || (d.crease_before && d.crease_before.striker);
+		const ns = d.non_striker || (d.crease_before && d.crease_before.non_striker);
+		addBatter(s);
+		addBatter(ns);
+		if (d.dismissed_player) addBatter(d.dismissed_player);
+		if (d.next_batter) addBatter(d.next_batter);
+		if (d.crease_after) {
+			addBatter(d.crease_after.striker);
+			addBatter(d.crease_after.non_striker);
+		}
+	});
+
+	if (crease) {
+		addBatter(crease.striker);
+		addBatter(crease.non_striker);
+	}
+
+	Object.keys(batting).forEach((name) => {
+		addBatter(name);
+	});
+
+	const didNotBat = [];
+	(batRoster || []).forEach((rawName) => {
+		const formatted = formatPlayerName(rawName);
+		if (!seenBatters.has(formatted)) {
+			didNotBat.push(formatted);
+		}
+	});
+
+	const bowlingOrder = [];
+	const seenBowlers = new Set();
+	const addBowler = (name) => {
+		const formatted = formatPlayerName(name);
+		if (!formatted || seenBowlers.has(formatted)) return;
+		if (bowling[formatted]) {
+			seenBowlers.add(formatted);
+			bowlingOrder.push(formatted);
+		}
+	};
+	if (openers && openers.bowler) addBowler(openers.bowler);
+	(deliveries || []).forEach((d) => {
+		if (d.bowler) addBowler(d.bowler);
+	});
+	if (crease && crease.bowler) addBowler(crease.bowler);
+	(bowRoster || []).forEach((rawName) => addBowler(rawName));
 
 	const oversGrouped = groupOvers(deliveries || []);
 	oversGrouped.forEach((ov) => {
@@ -2975,6 +3082,9 @@ function computeInningsScorecard(
 		totalWickets,
 		legalBalls,
 		batRoster,
+		battingOrder,
+		bowlingOrder,
+		didNotBat,
 		isAllOut,
 	};
 }
@@ -3005,15 +3115,14 @@ function renderScorecardHTML(title, data, isOpen, inningsKey) {
 				<tbody>
 	`;
 
-	const didNotBat = [];
-	(data.batRoster || Object.keys(data.batting)).forEach((name) => {
+	(data.battingOrder || []).forEach((name) => {
 		const b = data.batting[name];
 		if (b && b.hasBatted) {
 			const sr = b.balls > 0 ? ((b.runs / b.balls) * 100).toFixed(1) : "0.0";
 			html += `
 				<tr>
 					<td class="sc-col-player">
-						<span class="sc-player-name">${b.name}${!b.isOut ? "*" : ""}</span>
+						<span class="sc-player-name">${formatPlayerName(b.name)}${!b.isOut ? "*" : ""}</span>
 						<span class="sc-dismissal">${b.dismissal}</span>
 					</td>
 					<td class="sc-num"><strong>${b.runs}</strong></td>
@@ -3023,10 +3132,10 @@ function renderScorecardHTML(title, data, isOpen, inningsKey) {
 					<td class="sc-num">${sr}</td>
 				</tr>
 			`;
-		} else {
-			didNotBat.push(name);
 		}
 	});
+
+	const didNotBat = (data.didNotBat || []).map(formatPlayerName);
 
 	const ex = data.extras;
 	html += `
@@ -3064,7 +3173,7 @@ function renderScorecardHTML(title, data, isOpen, inningsKey) {
 		html += data.fow
 			.map(
 				(f) =>
-					`<span class="sc-fow-item"><strong>${f.score}-${f.wicketNum}</strong> (${f.player}, ${f.over} ov)</span>`,
+					`<span class="sc-fow-item"><strong>${f.score}-${f.wicketNum}</strong> (${formatPlayerName(f.player)}, ${f.over} ov)</span>`,
 			)
 			.join(" · ");
 		html += `
@@ -3090,9 +3199,9 @@ function renderScorecardHTML(title, data, isOpen, inningsKey) {
 				<tbody>
 	`;
 
-	const bowlersWhoBowled = Object.values(data.bowling).filter(
-		(b) => b.balls > 0 || b.wides > 0 || b.noBalls > 0 || b.runs > 0,
-	);
+	const bowlersWhoBowled = (data.bowlingOrder || Object.keys(data.bowling))
+		.map((name) => data.bowling[name])
+		.filter((b) => b && (b.balls > 0 || b.wides > 0 || b.noBalls > 0 || b.runs > 0));
 
 	if (!bowlersWhoBowled.length) {
 		html += `<tr><td colspan="8" class="hint" style="text-align:center">No bowling figures recorded yet.</td></tr>`;
@@ -3102,7 +3211,7 @@ function renderScorecardHTML(title, data, isOpen, inningsKey) {
 			const econ = b.balls > 0 ? (b.runs / (b.balls / 6)).toFixed(2) : "0.00";
 			html += `
 				<tr>
-					<td class="sc-col-player"><strong>${b.name}</strong></td>
+					<td class="sc-col-player"><strong>${formatPlayerName(b.name)}</strong></td>
 					<td class="sc-num">${ov}</td>
 					<td class="sc-num">${b.maidens}</td>
 					<td class="sc-num">${b.runs}</td>
@@ -3140,12 +3249,14 @@ function renderDetailedScorecard() {
 		const i1Side = i1.side || (state.batting_first === "B" ? "B" : "A");
 		const i1BatRoster = teamRoster(i1Side);
 		const i1BowRoster = teamRoster(i1Side === "B" ? "A" : "B");
+		const i1Openers = i1.openers || null;
 		const i1Data = computeInningsScorecard(
 			i1.deliveries || [],
 			i1BatRoster,
 			i1BowRoster,
 			i1.crease,
 			false,
+			i1Openers,
 		);
 		const i1Title = `Innings 1: ${i1.team || teamName(state, i1Side)}`;
 		const isI1Open = openScorecardInningsKey === "innings-1";
@@ -3155,12 +3266,17 @@ function renderDetailedScorecard() {
 	const curSide = battingSide();
 	const curBatRoster = battingRoster();
 	const curBowRoster = bowlingRoster();
+	const curOpeners =
+		state.openers && Number(state.openers_innings) === Number(state.innings)
+			? state.openers
+			: null;
 	const curData = computeInningsScorecard(
 		state.deliveries || [],
 		curBatRoster,
 		curBowRoster,
 		state.crease,
 		!isComplete(),
+		curOpeners,
 	);
 	const curTitle = `Innings ${state.innings}: ${battingTeamName()}${!isComplete() ? " (Live)" : ""}`;
 	const curKey =
@@ -3302,10 +3418,10 @@ function renderCrease() {
 	const cr = state.crease || {};
 	const bRoster = battingRoster();
 	const bowRoster = bowlingRoster();
-	const sName = cr.striker || bRoster[0] || "Striker";
+	const sName = cr.striker ? formatPlayerName(cr.striker) : (bRoster[0] || "Striker");
 	const isLone = !cr.non_striker;
-	const nsName = isLone ? "" : (cr.non_striker || bRoster[1] || "Non-Striker");
-	const bName = cr.bowler || bowRoster[0] || "Bowler";
+	const nsName = isLone ? "" : (cr.non_striker ? formatPlayerName(cr.non_striker) : (bRoster[1] || "Non-Striker"));
+	const bName = cr.bowler ? formatPlayerName(cr.bowler) : (bowRoster[0] || "Bowler");
 
 	const sStat = c.batBalls[sName] || { r: 0, b: 0, f: 0, s: 0 };
 	const nsStat = nsName ? (c.batBalls[nsName] || { r: 0, b: 0, f: 0, s: 0 }) : { r: 0, b: 0, f: 0, s: 0 };
@@ -3602,15 +3718,15 @@ async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 	if (!isAdmin || !current || isComplete()) return;
 	await ensureCreaseInitialized();
 	const cr = state.crease || {};
-	const striker = cr.striker || "Striker";
-	const nonStriker = cr.non_striker || null;
+	const striker = cr.striker ? formatPlayerName(cr.striker) : "Striker";
+	const nonStriker = cr.non_striker ? formatPlayerName(cr.non_striker) : null;
 	const isCurrentlyLone = !nonStriker;
 
 	const bRoster = battingRoster();
 	const outSet = new Set(
 		(state.deliveries || [])
 			.filter((d) => d.wicket)
-			.map((d) => String(d.dismissed_player || d.batter || d.striker)),
+			.map((d) => formatPlayerName(String(d.dismissed_player || d.batter || d.striker))),
 	);
 	const unbatted = bRoster.filter(
 		(p) => p !== striker && (!nonStriker || p !== nonStriker) && !outSet.has(p),
