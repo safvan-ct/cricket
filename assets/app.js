@@ -653,9 +653,9 @@ function matchDayLabel(key) {
 	today.setHours(0, 0, 0, 0);
 	const diff = Math.round((today - d) / 86400000);
 	const nice = d.toLocaleDateString(undefined, {
-		weekday: "long",
+		weekday: "short",
 		day: "numeric",
-		month: "long",
+		month: "short",
 		year: "numeric",
 	});
 	if (diff === 0) return "Today · " + nice;
@@ -1279,7 +1279,7 @@ async function showAddPlayerModal(prefill = "") {
 
 		const ok = await showModal({
 			title: "Add Player",
-			message: "Register a new player in the common directory:",
+			message: "Register a new player to the directory:",
 			confirmLabel: "Add Player",
 			showCancel: true,
 			showClose: true,
