@@ -1697,7 +1697,7 @@ async function showAddPlayerModal(prefill = "") {
 			// Row 3: Preview Box
 			const prevBox = document.createElement("div");
 			prevBox.style.cssText =
-				"font-size:12px;font-weight:600;color:var(--muted);background:#f4f9fd;border:1px dashed var(--sky);border-radius:8px;padding:8px 12px;margin-top:8px;display:flex;align-items:center;justify-content:space-between;";
+				"font-size:12px;font-weight:600;color:var(--muted);background:#f4f9fd;border:1px dashed var(--sky);border-radius:8px;padding:8px 12px;margin-top:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px;word-break:break-word;";
 			prevBox.innerHTML = `<span>Full Display Name:</span><strong style="color:var(--blue);font-size:13px" id="playerPreviewVal"></strong>`;
 			container.append(rowName, rowTag, prevBox);
 
@@ -1858,7 +1858,7 @@ async function showRenamePlayerModal(p) {
 			// Row 3: Preview Box
 			const prevBox = document.createElement("div");
 			prevBox.style.cssText =
-				"font-size:12px;font-weight:600;color:var(--muted);background:#f4f9fd;border:1px dashed var(--sky);border-radius:8px;padding:8px 12px;margin-top:8px;display:flex;align-items:center;justify-content:space-between;";
+				"font-size:12px;font-weight:600;color:var(--muted);background:#f4f9fd;border:1px dashed var(--sky);border-radius:8px;padding:8px 12px;margin-top:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px;word-break:break-word;";
 			prevBox.innerHTML = `<span>Full Display Name:</span><strong style="color:var(--blue);font-size:13px" id="playerPreviewVal"></strong>`;
 			container.append(rowName, rowTag, prevBox);
 
@@ -1988,12 +1988,14 @@ function maxWickets(s = state) {
 function hasValidInningsOpeners() {
 	if (!state || !state.openers) return false;
 	if (state.openers_innings && Number(state.openers_innings) !== Number(state.innings)) return false;
-	const { striker, non_striker, bowler } = state.openers;
-	if (!striker || !non_striker || !bowler || striker === non_striker) return false;
-	const bRoster = battingRoster();
-	const bowRoster = bowlingRoster();
-	if (!bRoster.includes(striker) || !bRoster.includes(non_striker)) return false;
-	if (!bowRoster.includes(bowler)) return false;
+	const s = state.openers.striker ? formatPlayerName(state.openers.striker) : "";
+	const ns = state.openers.non_striker ? formatPlayerName(state.openers.non_striker) : "";
+	const b = state.openers.bowler ? formatPlayerName(state.openers.bowler) : "";
+	if (!s || !ns || !b || s === ns) return false;
+	const bRoster = battingRoster().map(formatPlayerName);
+	const bowRoster = bowlingRoster().map(formatPlayerName);
+	if (!bRoster.includes(s) || !bRoster.includes(ns)) return false;
+	if (!bowRoster.includes(b)) return false;
 	return true;
 }
 
@@ -2001,13 +2003,16 @@ function isCreaseValidForCurrentInnings(cr = null) {
 	if (!state) return false;
 	const c = cr || state.crease;
 	if (!c || !c.striker || !c.bowler) return false;
-	const bRoster = battingRoster();
-	const bowRoster = bowlingRoster();
-	if (!bRoster.includes(c.striker)) return false;
-	if (!bowRoster.includes(c.bowler)) return false;
+	const s = formatPlayerName(c.striker);
+	const b = formatPlayerName(c.bowler);
+	const bRoster = battingRoster().map(formatPlayerName);
+	const bowRoster = bowlingRoster().map(formatPlayerName);
+	if (!bRoster.includes(s)) return false;
+	if (!bowRoster.includes(b)) return false;
 	if (c.non_striker) {
-		if (c.striker === c.non_striker) return false;
-		if (!bRoster.includes(c.non_striker)) return false;
+		const ns = formatPlayerName(c.non_striker);
+		if (s === ns) return false;
+		if (!bRoster.includes(ns)) return false;
 	}
 	return true;
 }
@@ -2019,16 +2024,25 @@ async function openInningsOpenerModal() {
 	const innTeam = battingTeamName();
 	const oppTeam = bowlingTeamName();
 
-	const hasCurrentOpeners = state.openers && Number(state.openers_innings) === Number(state.innings);
 	let striker = "";
 	let nonStriker = "";
 	let bowler = "";
 
+	let selStriker = null;
+	let selNon = null;
+	let selBow = null;
+
 	const content = (container) => {
+		const rowWarn = document.createElement("div");
+		rowWarn.id = "openersModalWarn";
+		rowWarn.className = "modal-custom-row hidden";
+		rowWarn.innerHTML = `<div style="background:#fee2e2;color:#991b1b;border:1px solid #f87171;border-radius:8px;padding:8px 12px;font-size:0.85rem;font-weight:600;width:100%;"></div>`;
+		container.append(rowWarn);
+
 		const row1 = document.createElement("div");
 		row1.className = "modal-custom-row";
 		row1.innerHTML = `<label>Opening Striker (${innTeam} · Facing ball 1) *</label>`;
-		const selStriker = document.createElement("select");
+		selStriker = document.createElement("select");
 		selStriker.className = "app-select";
 		selStriker.required = true;
 		const optStrikerDef = document.createElement("option");
@@ -2048,7 +2062,7 @@ async function openInningsOpenerModal() {
 		const row2 = document.createElement("div");
 		row2.className = "modal-custom-row";
 		row2.innerHTML = `<label>Opening Non-Striker (${innTeam}) *</label>`;
-		const selNon = document.createElement("select");
+		selNon = document.createElement("select");
 		selNon.className = "app-select";
 		selNon.required = true;
 		const optNonDef = document.createElement("option");
@@ -2067,6 +2081,7 @@ async function openInningsOpenerModal() {
 
 		selStriker.onchange = () => {
 			striker = selStriker.value;
+			rowWarn.classList.add("hidden");
 			if (striker && striker === nonStriker) {
 				nonStriker = "";
 				selNon.value = "";
@@ -2074,6 +2089,7 @@ async function openInningsOpenerModal() {
 		};
 		selNon.onchange = () => {
 			nonStriker = selNon.value;
+			rowWarn.classList.add("hidden");
 			if (nonStriker && nonStriker === striker) {
 				striker = "";
 				selStriker.value = "";
@@ -2086,7 +2102,7 @@ async function openInningsOpenerModal() {
 		const row3 = document.createElement("div");
 		row3.className = "modal-custom-row";
 		row3.innerHTML = `<label>Opening Bowler (${oppTeam}) *</label>`;
-		const selBow = document.createElement("select");
+		selBow = document.createElement("select");
 		selBow.className = "app-select";
 		selBow.required = true;
 		const optBowDef = document.createElement("option");
@@ -2104,13 +2120,14 @@ async function openInningsOpenerModal() {
 		});
 		selBow.onchange = () => {
 			bowler = selBow.value;
+			rowWarn.classList.add("hidden");
 		};
 		row3.append(selBow);
 
 		container.append(row1, row2, row3);
 	};
 
-	await showModal({
+	const ok = await showModal({
 		title: `${innTeam} — Innings ${state.innings} Openers`,
 		message: `Select opening batters for ${innTeam} and opening bowler for ${oppTeam}:`,
 		confirmLabel: "Start Scoring",
@@ -2118,28 +2135,60 @@ async function openInningsOpenerModal() {
 		showClose: false,
 		customContent: content,
 		validate: () => {
-			if (!striker) {
-				showError("Please select the opening striker.");
+			const s = (selStriker && selStriker.value) ? selStriker.value : striker;
+			const ns = (selNon && selNon.value) ? selNon.value : nonStriker;
+			const b = (selBow && selBow.value) ? selBow.value : bowler;
+
+			const errBox = $("openersModalWarn");
+			const showErr = (msg) => {
+				if (errBox) {
+					errBox.querySelector("div").textContent = "⚠️ " + msg;
+					errBox.classList.remove("hidden");
+				}
+			};
+
+			if (!s) {
+				showErr("Please select the opening striker.");
+				if (selStriker) selStriker.focus();
 				return false;
 			}
-			if (!nonStriker) {
-				showError("Please select the opening non-striker.");
+			if (!ns) {
+				showErr("Please select the opening non-striker.");
+				if (selNon) selNon.focus();
 				return false;
 			}
-			if (!bowler) {
-				showError("Please select the opening bowler.");
+			if (s === ns) {
+				showErr("Opening striker and non-striker must be different players.");
+				if (selNon) selNon.focus();
 				return false;
 			}
-			if (striker === nonStriker) {
-				showError("Opening striker and non-striker must be different players.");
+			if (!b) {
+				showErr("Please select the opening bowler.");
+				if (selBow) selBow.focus();
 				return false;
 			}
+			striker = s;
+			nonStriker = ns;
+			bowler = b;
 			return true;
 		},
 	});
 
-	state.crease = { striker, non_striker: nonStriker, bowler };
-	state.openers = { striker, non_striker: nonStriker, bowler };
+	if (!ok || !striker || !nonStriker || !bowler || striker === nonStriker) {
+		if (isAdmin && !isComplete()) {
+			setTimeout(() => {
+				openInningsOpenerModal();
+			}, 60);
+		}
+		return;
+	}
+
+	state.crease = {
+		striker: formatPlayerName(striker),
+		non_striker: formatPlayerName(nonStriker),
+		bowler: formatPlayerName(bowler),
+	};
+	state.openers = { ...state.crease };
 	state.openers_innings = state.innings;
 
 	try {
@@ -2232,7 +2281,11 @@ async function chooseNextBowlerModal(prevBowler, defaultBowler = null) {
 }
 async function changeBattersModal() {
 	if (!isAdmin || !current || !state || isComplete()) return;
-	await ensureCreaseInitialized();
+	const initialized = await ensureCreaseInitialized();
+	if (!initialized || !isCreaseValidForCurrentInnings()) {
+		await openInningsOpenerModal();
+		if (!isCreaseValidForCurrentInnings()) return;
+	}
 	const cr = state.crease || {};
 	const bRoster = battingRoster();
 	const deliveries = state.deliveries || [];
@@ -2368,27 +2421,28 @@ async function changeBattersModal() {
 	}
 }
 async function ensureCreaseInitialized() {
-	if (!isAdmin || !current || !state || isComplete()) return;
+	if (!isAdmin || !current || !state || isComplete()) return false;
 	const deliveries = state.deliveries || [];
 	if (deliveries.length === 0) {
 		if (hasValidInningsOpeners()) {
-			state.crease = state.openers;
+			state.crease = { ...state.openers };
 			render();
-			return;
+			return true;
 		}
 		await openInningsOpenerModal();
-		return;
+		return hasValidInningsOpeners();
 	}
 	if (isCreaseValidForCurrentInnings()) {
-		return;
+		return true;
 	}
 	const last = deliveries[deliveries.length - 1];
 	if (last && last.crease_after && isCreaseValidForCurrentInnings(last.crease_after)) {
-		state.crease = last.crease_after;
+		state.crease = { ...last.crease_after };
 		render();
-		return;
+		return true;
 	}
 	await openInningsOpenerModal();
+	return isCreaseValidForCurrentInnings();
 }
 async function openMatch(id, skipHistory = false) {
 	const r = await api("get", "GET", null, id);
@@ -3413,15 +3467,24 @@ function renderCrease() {
 		hud.classList.add("hidden");
 		return;
 	}
+	const deliveries = state.deliveries || [];
+	const hasOpeners = hasValidInningsOpeners();
+	const hasCrease = isCreaseValidForCurrentInnings();
+	if (deliveries.length === 0 && !hasOpeners && !hasCrease) {
+		hud.classList.add("hidden");
+		return;
+	}
+	const cr = state.crease || {};
+	const sName = cr.striker ? formatPlayerName(cr.striker) : "";
+	const isLone = !cr.non_striker;
+	const nsName = isLone ? "" : (cr.non_striker ? formatPlayerName(cr.non_striker) : "");
+	const bName = cr.bowler ? formatPlayerName(cr.bowler) : "";
+	if (!sName || !bName) {
+		hud.classList.add("hidden");
+		return;
+	}
 	hud.classList.remove("hidden");
 	const c = calc();
-	const cr = state.crease || {};
-	const bRoster = battingRoster();
-	const bowRoster = bowlingRoster();
-	const sName = cr.striker ? formatPlayerName(cr.striker) : (bRoster[0] || "Striker");
-	const isLone = !cr.non_striker;
-	const nsName = isLone ? "" : (cr.non_striker ? formatPlayerName(cr.non_striker) : (bRoster[1] || "Non-Striker"));
-	const bName = cr.bowler ? formatPlayerName(cr.bowler) : (bowRoster[0] || "Bowler");
 
 	const sStat = c.batBalls[sName] || { r: 0, b: 0, f: 0, s: 0 };
 	const nsStat = nsName ? (c.batBalls[nsName] || { r: 0, b: 0, f: 0, s: 0 }) : { r: 0, b: 0, f: 0, s: 0 };
@@ -3716,10 +3779,15 @@ async function notifyPhaseChange(overDetails = null) {
 }
 async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 	if (!isAdmin || !current || isComplete()) return;
-	await ensureCreaseInitialized();
+	const initialized = await ensureCreaseInitialized();
+	if (!initialized || !isCreaseValidForCurrentInnings()) {
+		await openInningsOpenerModal();
+		if (!isCreaseValidForCurrentInnings()) return;
+	}
 	const cr = state.crease || {};
-	const striker = cr.striker ? formatPlayerName(cr.striker) : "Striker";
+	const striker = cr.striker ? formatPlayerName(cr.striker) : "";
 	const nonStriker = cr.non_striker ? formatPlayerName(cr.non_striker) : null;
+	if (!striker) return;
 	const isCurrentlyLone = !nonStriker;
 
 	const bRoster = battingRoster();
@@ -4071,7 +4139,11 @@ async function recordBallWithRotation({
 	nextBatter = null,
 }) {
 	if (!isAdmin || !current || isComplete()) return;
-	await ensureCreaseInitialized();
+	const initialized = await ensureCreaseInitialized();
+	if (!initialized || !isCreaseValidForCurrentInnings()) {
+		await openInningsOpenerModal();
+		if (!isCreaseValidForCurrentInnings()) return;
+	}
 
 	try {
 		const prev = state;
@@ -4079,11 +4151,13 @@ async function recordBallWithRotation({
 		const prevStatus = state.status;
 
 		const cr = state.crease || {};
-		const bRoster = battingRoster();
-		const bowRoster = bowlingRoster();
-		const curStriker = cr.striker ? formatPlayerName(cr.striker) : (bRoster[0] || "Player 1");
+		const curStriker = cr.striker ? formatPlayerName(cr.striker) : "";
 		const curNonStriker = cr.non_striker ? formatPlayerName(cr.non_striker) : null;
-		const curBowler = cr.bowler ? formatPlayerName(cr.bowler) : (bowRoster[0] || "Player 1");
+		const curBowler = cr.bowler ? formatPlayerName(cr.bowler) : "";
+		if (!curStriker || !curBowler) {
+			await openInningsOpenerModal();
+			return;
+		}
 
 		const creaseBefore = {
 			striker: curStriker,
@@ -4276,6 +4350,11 @@ function addonValue() {
 }
 async function openDeliveryPopup(type) {
 	if (!isAdmin || !current || isComplete()) return;
+	const initialized = await ensureCreaseInitialized();
+	if (!initialized || !isCreaseValidForCurrentInnings()) {
+		await openInningsOpenerModal();
+		if (!isCreaseValidForCurrentInnings()) return;
+	}
 	const isWicket = type === "wicket";
 	if (isWicket) {
 		await openWicketDeliveryModal("");
@@ -4324,7 +4403,11 @@ document
 
 $("swapStrikeBtn").onclick = async () => {
 	if (!isAdmin || !current || !state || isComplete()) return;
-	await ensureCreaseInitialized();
+	const initialized = await ensureCreaseInitialized();
+	if (!initialized || !isCreaseValidForCurrentInnings()) {
+		await openInningsOpenerModal();
+		if (!isCreaseValidForCurrentInnings()) return;
+	}
 	if (!state.crease || !state.crease.non_striker) return;
 	const s = state.crease.striker;
 	const ns = state.crease.non_striker;
@@ -4342,7 +4425,11 @@ const changeBatBtn = $("changeBattersBtn");
 if (changeBatBtn) changeBatBtn.onclick = changeBattersModal;
 $("changeBowlerBtn").onclick = async () => {
 	if (!isAdmin || !current || !state || isComplete()) return;
-	await ensureCreaseInitialized();
+	const initialized = await ensureCreaseInitialized();
+	if (!initialized || !isCreaseValidForCurrentInnings()) {
+		await openInningsOpenerModal();
+		if (!isCreaseValidForCurrentInnings()) return;
+	}
 	const prevBowler = getPreviousOverBowler();
 	await chooseNextBowlerModal(prevBowler, (state.crease && state.crease.bowler) || null);
 };
@@ -4440,7 +4527,10 @@ $("modalOk").onclick = async () => {
 						sel.reportValidity();
 					}
 				} catch (e) {}
-				const warnBox = custom.querySelector("#wicketModalWarn");
+				const warnBox =
+					custom.querySelector("#wicketModalWarn") ||
+					custom.querySelector("#openersModalWarn") ||
+					custom.querySelector(".modal-warn");
 				if (warnBox) {
 					const alertDiv = warnBox.querySelector("div") || warnBox;
 					const row = sel.closest(".modal-custom-row");

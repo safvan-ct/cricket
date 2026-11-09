@@ -11,8 +11,16 @@
     --red: #c43d3d
 }
 
-* {
-    box-sizing: border-box
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    max-width: 100%;
+    overflow-x: hidden;
 }
 
 body {
@@ -22,7 +30,8 @@ body {
     font-family: 'DM Sans', sans-serif;
     display: flex;
     flex-direction: column;
-    min-height: 100vh
+    min-height: 100vh;
+    -webkit-text-size-adjust: 100%;
 }
 
 header {
@@ -311,10 +320,12 @@ button {
     gap: 8px;
     width: 100%;
     margin-bottom: 14px;
+    flex-wrap: wrap;
 }
 
 .setup-actions button {
     margin: 0;
+    flex: 1 1 auto;
 }
 
 #cancelSetup {
@@ -334,6 +345,8 @@ button {
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+    flex-wrap: wrap;
+    word-break: break-word;
 }
 
 .import-notice button.link-btn {
@@ -537,7 +550,10 @@ button {
 /* Scorecard tables */
 .table-wrap {
     overflow-x: auto;
-    margin: 8px 0 18px
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+    width: 100%;
+    margin: 8px 0 18px;
 }
 
 table {
@@ -655,45 +671,6 @@ td:first-child {
     border-color: var(--sky)
 }
 
-/* Responsive */
-@media(max-width:600px) {
-    main {
-        margin: 22px auto
-    }
-
-    .panel {
-        padding: 17px
-    }
-
-    .topline h1 {
-        font-size: 24px
-    }
-
-    .match-card {
-        align-items: flex-start;
-        flex-direction: column
-    }
-
-    .match-actions {
-        width: 100%;
-        flex-wrap: wrap
-    }
-
-    .match-actions button {
-        flex: 1 1 40%;
-        width: auto;
-        min-width: 0
-    }
-
-    .match-actions .mark-complete {
-        flex: 1 0 100%;
-        order: -1
-    }
-
-    .sb-runs {
-        font-size: 44px
-    }
-}
 
 /* Score hero */
 .score-hero {
@@ -893,18 +870,20 @@ td:first-child {
 .score-actions {
     display: flex;
     flex-direction: row;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
     gap: 8px;
     width: 100%;
-    margin-top: 14px
+    margin-top: 14px;
 }
 
 .score-actions .ghost {
     margin-bottom: 0;
     width: auto;
-    flex: 0 0 auto
+    flex: 1 1 auto;
+    text-align: center;
+    min-width: 0;
 }
 
 #recordPanel.scoring-locked .keypad,
@@ -1034,8 +1013,9 @@ td:first-child {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px;
-    z-index: 200
+    padding: 16px;
+    z-index: 200;
+    box-sizing: border-box;
 }
 
 .modal.hidden {
@@ -1047,12 +1027,15 @@ td:first-child {
     background: #fff;
     border-radius: 16px;
     border-top: 4px solid var(--gold);
-    padding: 22px 22px 18px;
+    padding: 22px 20px 18px;
     max-width: 440px;
     width: 100%;
     box-shadow: 0 16px 48px #00000050;
     max-height: 92vh;
-    overflow-y: auto
+    max-height: 92dvh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-sizing: border-box;
 }
 
 .modal-close {
@@ -1095,12 +1078,14 @@ td:first-child {
 .modal-actions {
     display: flex;
     justify-content: center;
-    gap: 8px
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
 .modal-actions button {
-    flex: 1;
-    margin: 0
+    flex: 1 1 120px;
+    margin: 0;
+    min-width: 0;
 }
 
 .modal-fields {
@@ -1290,25 +1275,24 @@ td:first-child {
     margin-bottom: 14px
 }
 
-@media(max-width:640px) {
-    .crease-hud {
-        grid-template-columns: 1fr
-    }
-}
 
 .crease-card {
     background: #fff;
     border: 1px solid var(--line);
     border-radius: 14px;
     padding: 12px 14px;
-    box-shadow: 0 4px 16px #0030870a
+    box-shadow: 0 4px 16px #0030870a;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .crease-card-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px
+    margin-bottom: 8px;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
 .crease-card-head .subhead {
@@ -1396,7 +1380,8 @@ td:first-child {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 130px
+    max-width: 130px;
+    min-width: 0;
 }
 
 .player-stats {
@@ -1555,14 +1540,14 @@ td:first-child {
     user-select: none;
     display: flex;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: space-between;
     gap: 8px;
     padding: 14px 16px;
-    font-weight: 800
+    font-weight: 800;
 }
 
 .scorecard-innings[open]>.scorecard-innings-head {
-    border-bottom: 1px solid var(--line)
+    border-bottom: 1px solid var(--line);
 }
 
 .scorecard-innings-head .over-team-name {
@@ -1570,7 +1555,10 @@ td:first-child {
     letter-spacing: .3px;
     font-weight: 800;
     margin-right: auto;
-    text-align: left
+    text-align: left;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .scorecard-innings-head .over-team-score {
@@ -1578,12 +1566,15 @@ td:first-child {
     color: var(--blue);
     margin-left: auto;
     text-align: right;
-    white-space: nowrap
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .scorecard-innings-body {
     padding: 12px 14px 16px;
-    overflow-x: auto
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
 }
 
 .sc-table {
@@ -1707,7 +1698,8 @@ td:first-child {
 }
 
 .sc-fow-item {
-    white-space: nowrap
+    white-space: normal;
+    word-break: break-word;
 }
 
 .sc-fow-item strong {
@@ -1980,7 +1972,15 @@ td:first-child {
     border-radius: 16px;
     font-size: 12px;
     font-weight: 700;
-    user-select: none
+    user-select: none;
+    max-width: 100%;
+}
+
+.sel-chip-name {
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .sel-chip-num {
@@ -1991,7 +1991,8 @@ td:first-child {
     display: grid;
     place-items: center;
     font-size: 10px;
-    font-weight: 800
+    font-weight: 800;
+    flex-shrink: 0;
 }
 
 .sel-chip-remove {
@@ -2003,7 +2004,8 @@ td:first-child {
     cursor: pointer;
     padding: 0 0 0 2px;
     margin: 0;
-    font-weight: 800
+    font-weight: 800;
+    flex-shrink: 0;
 }
 
 .sel-chip-remove:hover {
@@ -2013,11 +2015,13 @@ td:first-child {
 .chip-input-row {
     display: flex;
     gap: 6px;
-    margin-bottom: 8px
+    margin-bottom: 8px;
+    width: 100%;
 }
 
 .chip-search-input {
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 0;
     padding: 8px 12px;
     border: 1.5px solid var(--line);
     border-radius: 8px;
@@ -2037,7 +2041,8 @@ td:first-child {
     border-radius: 8px;
     font-weight: 800;
     font-size: 12px;
-    cursor: pointer
+    cursor: pointer;
+    flex-shrink: 0;
 }
 
 .chip-add-btn:hover {
@@ -2076,7 +2081,11 @@ td:first-child {
     font-weight: 700;
     color: var(--ink);
     cursor: pointer;
-    transition: all .15s
+    transition: all .15s;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .pool-chip:hover:not(.disabled):not(.selected) {
@@ -2369,4 +2378,411 @@ td:first-child {
 .sc-dismissal,
 .app-select option {
     text-transform: capitalize;
+}
+
+/* ==========================================================================
+   Responsive & Mobile Overflow Protections
+   ========================================================================== */
+
+@media (max-width: 640px) {
+    .crease-hud {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    header {
+        height: 60px;
+        padding: 0 14px;
+    }
+
+    .brand b {
+        font-size: 13px;
+        letter-spacing: 1.2px;
+    }
+
+    .brand small {
+        font-size: 8px;
+        letter-spacing: 1.5px;
+    }
+
+    .ball {
+        font-size: 20px;
+    }
+
+    .header-actions {
+        gap: 6px;
+    }
+
+    .header-actions button {
+        padding: 8px 11px;
+        font-size: 12px;
+    }
+
+    .qr-btn {
+        min-width: 36px;
+        height: 36px;
+        padding: 7px 9px;
+    }
+
+    main {
+        margin: 16px auto;
+        padding: 0 12px;
+        max-width: 100%;
+        width: 100%;
+    }
+
+    .panel {
+        padding: 14px;
+        border-radius: 14px;
+        margin-bottom: 14px;
+    }
+
+    .topline {
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: flex-start;
+        margin-bottom: 16px;
+    }
+
+    .topline h1 {
+        font-size: 24px;
+    }
+
+    .topline button {
+        margin-top: 2px;
+    }
+
+    .section-head {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .section-head #matchTitle {
+        word-break: break-word;
+        text-align: right;
+    }
+
+    .main-tabs {
+        gap: 8px;
+        margin-bottom: 14px;
+    }
+
+    .main-tab-btn {
+        padding: 10px 10px;
+        font-size: 13px;
+        border-radius: 10px;
+    }
+
+    .match-card {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 12px;
+    }
+
+    .match-actions {
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .match-actions button {
+        flex: 1 1 40%;
+        width: auto;
+        min-width: 0;
+        padding: 8px 8px;
+        font-size: 12px;
+    }
+
+    .match-actions .mark-complete {
+        flex: 1 0 100%;
+        order: -1;
+    }
+
+    .score-hero {
+        padding: 14px 12px;
+        border-radius: 14px;
+        margin-bottom: 12px;
+    }
+
+    .sb-runs {
+        font-size: 44px;
+    }
+
+    .sb-slash {
+        font-size: 32px;
+    }
+
+    .sb-ov {
+        font-size: 15px;
+    }
+
+    .sb-rr-inline {
+        font-size: 13px;
+    }
+
+    .keypad button {
+        height: 52px;
+        font-size: 17px;
+    }
+
+    .leaderboard-grid {
+        grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+
+    .player-directory-head {
+        gap: 6px;
+    }
+
+    .modal {
+        padding: 10px;
+    }
+
+    .modal-card {
+        padding: 16px 14px 14px;
+        border-radius: 14px;
+        max-height: 92vh;
+        max-height: 92dvh;
+    }
+
+    .modal-card h2 {
+        font-size: 18px;
+        margin: 0 28px 8px 0;
+    }
+
+    .modal-actions {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .modal-actions button {
+        flex: 1 1 110px;
+    }
+
+    .career-hero-section {
+        margin: -16px -14px 12px -14px;
+        padding: 14px 14px 12px 14px;
+    }
+
+    .career-hero h2 {
+        font-size: 18px;
+    }
+
+    .career-stats-summary {
+        grid-template-columns: repeat(auto-fit, minmax(min(64px, 100%), 1fr));
+        gap: 6px;
+        margin-bottom: 12px;
+    }
+
+    .career-stat-box {
+        padding: 6px 4px;
+    }
+
+    .career-stat-val {
+        font-size: 16px;
+    }
+
+    .career-actions {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .career-actions button {
+        flex: 1 1 45%;
+        white-space: normal;
+        padding: 8px 4px;
+        font-size: 11px;
+    }
+}
+
+@media (max-width: 520px) {
+    .crease-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+        padding: 8px 10px;
+    }
+
+    .batter-meta,
+    .bowler-meta {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .player-name {
+        max-width: calc(100% - 65px);
+    }
+
+    .player-stats {
+        font-size: 11.5px;
+        width: 100%;
+        white-space: normal;
+        word-break: break-word;
+    }
+
+    .crease-actions-group {
+        gap: 4px;
+    }
+
+    .swap-strike-btn,
+    .change-batters-btn,
+    .change-bowler-btn {
+        padding: 4px 7px;
+        font-size: 10.5px;
+    }
+}
+
+@media (max-width: 480px) {
+    main {
+        padding: 0 8px;
+    }
+
+    .panel {
+        padding: 12px;
+        border-radius: 12px;
+    }
+
+    .sb-runs {
+        font-size: 38px;
+    }
+
+    .sb-slash {
+        font-size: 28px;
+    }
+
+    .sb-ov {
+        font-size: 13px;
+    }
+
+    .sb-rr-inline {
+        font-size: 12px;
+    }
+
+    .team-inputs-row {
+        gap: 8px;
+    }
+
+    .team-name-col {
+        flex: 1 1 auto;
+        width: auto;
+        min-width: 0;
+    }
+
+    .team-players-col {
+        flex: 0 0 72px;
+        width: 72px;
+        min-width: 72px;
+    }
+
+    .team-block {
+        padding: 10px;
+        gap: 10px;
+    }
+
+    .toss-options {
+        gap: 8px;
+    }
+
+    .toss-pill {
+        padding: 10px 6px;
+        font-size: 12px;
+    }
+
+    .keypad button {
+        height: 48px;
+        font-size: 15px;
+    }
+
+    .score-actions .ghost {
+        padding: 8px 8px;
+        font-size: 11.5px;
+    }
+
+    .ball-chip {
+        min-width: 30px;
+        height: 30px;
+        font-size: 10px;
+        padding: 0 6px;
+    }
+
+    .over-team-summary {
+        padding: 12px 10px;
+        gap: 6px;
+    }
+
+    .over-team-name {
+        font-size: 12px;
+    }
+
+    .over-team-score {
+        font-size: 15px;
+    }
+
+    .match-actions button {
+        flex: 1 1 100%;
+    }
+
+    .pagination-bar,
+    .log-pagination {
+        justify-content: center;
+        gap: 6px;
+    }
+
+    .pagination-info,
+    .log-pag-info {
+        width: 100%;
+        text-align: center;
+        margin-bottom: 2px;
+    }
+}
+
+@media (max-width: 360px) {
+    header {
+        padding: 0 8px;
+    }
+
+    .brand {
+        gap: 6px;
+    }
+
+    .brand b {
+        font-size: 12px;
+        letter-spacing: 1px;
+    }
+
+    .brand small {
+        display: none;
+    }
+
+    .header-actions {
+        gap: 4px;
+    }
+
+    .header-actions button {
+        padding: 7px 8px;
+        font-size: 11px;
+    }
+
+    .topline h1 {
+        font-size: 20px;
+    }
+
+    .sb-runs {
+        font-size: 34px;
+    }
+
+    .modal {
+        padding: 6px;
+    }
+
+    .modal-card {
+        padding: 14px 10px 12px;
+    }
+
+    .career-hero-section {
+        margin: -14px -10px 10px -10px;
+        padding: 12px 10px 10px 10px;
+    }
 }
