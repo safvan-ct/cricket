@@ -3741,13 +3741,10 @@ async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 	// Case 2: Transition to lone batter -> this dismissal leaves 1 batter standing alone
 	const willBeLoneBatter = !isFinalWicket && unbatted.length === 0;
 
-	let dismissal = (extraType === "wide" || extraType === "no-ball") ? "run out" : "";
-	let dismissedPlayer = striker;
-	let nextBatter = unbatted.length > 0 ? unbatted[0] : "";
-	const runsVal = (initialRuns !== undefined && initialRuns !== null && !isNaN(initialRuns))
-		? Math.min(3, Math.max(0, parseInt(initialRuns, 10)))
-		: 0;
-	let runs = runsVal;
+	let dismissal = "";
+	let dismissedPlayer = "";
+	let nextBatter = "";
+	let runs = null;
 
 	let selDismissal = null;
 	let selPlayer = null;
@@ -3780,7 +3777,7 @@ async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 		optDismissalDef.value = "";
 		optDismissalDef.textContent = "Select any option";
 		optDismissalDef.disabled = true;
-		if (!dismissal) optDismissalDef.selected = true;
+		optDismissalDef.selected = true;
 		selDismissal.append(optDismissalDef);
 
 		const dismissalList =
@@ -3794,16 +3791,13 @@ async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 			const opt = document.createElement("option");
 			opt.value = d;
 			opt.textContent = d.toUpperCase();
-			if (d === dismissal) opt.selected = true;
 			selDismissal.append(opt);
 		});
-		if (dismissal) {
-			selDismissal.value = dismissal;
-		}
+		selDismissal.value = "";
 		rowDismissal.append(selDismissal);
 
 		const rowPlayer = document.createElement("div");
-		rowPlayer.className = "modal-custom-row";
+		rowPlayer.className = "modal-custom-row hidden";
 		rowPlayer.innerHTML = `<label>Dismissed Batter *</label>`;
 		selPlayer = document.createElement("select");
 		selPlayer.className = "app-select";
@@ -3811,8 +3805,9 @@ async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 
 		const optPlayerDef = document.createElement("option");
 		optPlayerDef.value = "";
-		optPlayerDef.textContent = "Select dismissed batter";
+		optPlayerDef.textContent = "Select any option";
 		optPlayerDef.disabled = true;
+		optPlayerDef.selected = true;
 		selPlayer.append(optPlayerDef);
 
 		const optStriker = document.createElement("option");
@@ -3820,7 +3815,6 @@ async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 		optStriker.textContent = isCurrentlyLone
 			? `${striker} (Lone Batter)`
 			: `${striker} (Striker)`;
-		optStriker.selected = true;
 		selPlayer.append(optStriker);
 		if (nonStriker) {
 			const optNon = document.createElement("option");
@@ -3828,7 +3822,7 @@ async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 			optNon.textContent = `${nonStriker} (Non-Striker)`;
 			selPlayer.append(optNon);
 		}
-		selPlayer.value = striker;
+		selPlayer.value = "";
 		rowPlayer.append(selPlayer);
 
 		const rowRuns = document.createElement("div");
@@ -3839,16 +3833,20 @@ async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 		selRuns.required = true;
 		selRuns.disabled = true;
 
+		const optRunsDef = document.createElement("option");
+		optRunsDef.value = "";
+		optRunsDef.textContent = "Select any option";
+		optRunsDef.disabled = true;
+		optRunsDef.selected = true;
+		selRuns.append(optRunsDef);
+
 		[0, 1, 2, 3].forEach((r) => {
 			const opt = document.createElement("option");
 			opt.value = String(r);
 			opt.textContent = r === 1 ? "1 run" : r + " runs";
-			if (r === runsVal) {
-				opt.selected = true;
-			}
 			selRuns.append(opt);
 		});
-		selRuns.value = String(runsVal);
+		selRuns.value = "";
 		rowRuns.append(selRuns);
 
 		const rowNext = document.createElement("div");
@@ -3865,7 +3863,7 @@ async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 			rowNext.innerHTML = `
 				<div class="lone-alert" style="background:#e0f2fe;color:#0369a1;border:1px solid #7dd3fc;border-radius:8px;padding:10px 12px;font-size:0.9rem;font-weight:600;display:flex;align-items:center;gap:8px;width:100%;">
 					<span style="font-size:1.2rem;">🏏</span>
-					<span>Last Batter Stands — <strong id="loneBatterNotice">${loneName}</strong> will continue batting alone!</span>
+					<span>Last Batter Stands — <strong id="loneBatterNotice">${loneName || "Remaining batter"}</strong> will continue batting alone!</span>
 				</div>
 			`;
 		} else {
@@ -3876,26 +3874,22 @@ async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 
 			const optNextDef = document.createElement("option");
 			optNextDef.value = "";
-			optNextDef.textContent = "Select next incoming batter";
+			optNextDef.textContent = "Select any option";
 			optNextDef.disabled = true;
+			optNextDef.selected = true;
 			selNext.append(optNextDef);
 
-			unbatted.forEach((p, idx) => {
+			unbatted.forEach((p) => {
 				const opt = document.createElement("option");
 				opt.value = p;
 				opt.textContent = p;
-				if (idx === 0) {
-					opt.selected = true;
-					nextBatter = p;
-				}
 				selNext.append(opt);
 			});
-			if (unbatted.length > 0) {
-				selNext.value = unbatted[0];
-				nextBatter = unbatted[0];
-			}
+			selNext.value = "";
+			nextBatter = "";
 			selNext.onchange = () => {
 				nextBatter = selNext.value;
+				rowWarn.classList.add("hidden");
 			};
 			rowNext.append(selNext);
 		}
@@ -3905,14 +3899,17 @@ async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 			const isRunOut = dVal === "run out";
 			rowPlayer.classList.toggle("hidden", !dVal);
 			selPlayer.disabled = !isRunOut || isCurrentlyLone;
-			if (dVal && !isRunOut) {
-				selPlayer.value = striker;
-				dismissedPlayer = striker;
+			if (!dVal) {
+				selPlayer.value = "";
+				dismissedPlayer = "";
 			} else if (isRunOut) {
-				if (!selPlayer.value) {
+				if (isCurrentlyLone) {
 					selPlayer.value = striker;
+					dismissedPlayer = striker;
+				} else {
+					selPlayer.value = "";
+					dismissedPlayer = "";
 				}
-				dismissedPlayer = selPlayer.value || striker;
 			} else {
 				selPlayer.value = striker;
 				dismissedPlayer = striker;
@@ -3921,17 +3918,15 @@ async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 			selRuns.disabled = !isRunOut;
 			if (!isRunOut) {
 				runs = 0;
+				selRuns.value = "";
 			} else {
-				if (selRuns.value === "") {
-					selRuns.value = String(runsVal);
-				}
-				runs = parseInt(selRuns.value, 10);
-				if (isNaN(runs)) runs = 0;
+				selRuns.value = "";
+				runs = null;
 			}
 			if (willBeLoneBatter) {
 				const loneEl = $("loneBatterNotice");
 				if (loneEl) {
-					loneEl.textContent = dismissedPlayer === striker ? nonStriker : striker;
+					loneEl.textContent = (dismissedPlayer === striker ? nonStriker : striker) || "Remaining batter";
 				}
 			}
 		}
@@ -3947,13 +3942,12 @@ async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 			if (willBeLoneBatter) {
 				const loneEl = $("loneBatterNotice");
 				if (loneEl) {
-					loneEl.textContent = dismissedPlayer === striker ? nonStriker : striker;
+					loneEl.textContent = (dismissedPlayer === striker ? nonStriker : striker) || "Remaining batter";
 				}
 			}
 		};
 		selRuns.onchange = () => {
-			runs = selRuns.value === "" ? 0 : parseInt(selRuns.value, 10);
-			if (isNaN(runs)) runs = 0;
+			runs = selRuns.value === "" ? null : parseInt(selRuns.value, 10);
 			rowWarn.classList.add("hidden");
 		};
 
@@ -3989,30 +3983,35 @@ async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 					errBox.querySelector("div").textContent = "⚠️ Please select a dismissal type.";
 					errBox.classList.remove("hidden");
 				}
+				if (selDismissal) selDismissal.focus();
 				return false;
 			}
 			dismissal = dVal;
 			const isRunOut = dismissal === "run out";
 			if (isRunOut) {
-				dismissedPlayer = (selPlayer && selPlayer.value) ? selPlayer.value : (dismissedPlayer || striker);
-				if (!dismissedPlayer) {
+				const pVal = (selPlayer && selPlayer.value) ? selPlayer.value : dismissedPlayer;
+				if (!pVal) {
 					const errBox = $("wicketModalWarn");
 					if (errBox) {
 						errBox.querySelector("div").textContent = "⚠️ Please select the dismissed batter.";
 						errBox.classList.remove("hidden");
 					}
+					if (selPlayer) selPlayer.focus();
 					return false;
 				}
-				const r = (selRuns && selRuns.value !== "") ? parseInt(selRuns.value, 10) : runs;
-				if (isNaN(r)) {
+				dismissedPlayer = pVal;
+
+				const rVal = (selRuns && selRuns.value !== "") ? parseInt(selRuns.value, 10) : runs;
+				if (rVal === null || rVal === undefined || isNaN(rVal)) {
 					const errBox = $("wicketModalWarn");
 					if (errBox) {
 						errBox.querySelector("div").textContent = "⚠️ Please select runs completed before dismissal.";
 						errBox.classList.remove("hidden");
 					}
+					if (selRuns) selRuns.focus();
 					return false;
 				}
-				runs = r;
+				runs = rVal;
 			} else {
 				dismissedPlayer = striker;
 				runs = 0;
@@ -4025,6 +4024,7 @@ async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 						errBox.querySelector("div").textContent = "⚠️ Please select the next incoming batter.";
 						errBox.classList.remove("hidden");
 					}
+					if (selNext) selNext.focus();
 					return false;
 				}
 				nextBatter = nb;
