@@ -2482,16 +2482,20 @@ td:first-child {
 
     .match-actions {
         width: 100%;
+        display: flex;
+        flex-direction: row;
         flex-wrap: wrap;
-        gap: 6px;
+        gap: 8px;
     }
 
     .match-actions button {
-        flex: 1 1 40%;
+        flex: 1 1 0;
         width: auto;
         min-width: 0;
-        padding: 8px 8px;
+        padding: 9px 10px;
         font-size: 12px;
+        margin: 0;
+        text-align: center;
     }
 
     .match-actions .mark-complete {
@@ -2720,9 +2724,6 @@ td:first-child {
         font-size: 15px;
     }
 
-    .match-actions button {
-        flex: 1 1 100%;
-    }
 
     .pagination-bar,
     .log-pagination {

@@ -1,4 +1,4 @@
-const CACHE = 'scoreboard-v23';
+const CACHE = 'scoreboard-v24';
 const SHELL = ['./', './index.php', './assets/style.css', './assets/app.js', './assets/qrcode.min.js', './assets/favicon.svg', './assets/icon-192.png', './assets/icon-512.png', './manifest.webmanifest'];
 function fresh(request){return fetch(request,{cache:'no-cache'})}
 self.addEventListener('install', event => {
