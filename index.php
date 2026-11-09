@@ -16,6 +16,7 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
   <meta name="theme-color" content="#002868">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Cricket">
+  <link rel="stylesheet" href="assets/choices.min.css?v=<?php echo filemtime(__DIR__ . '/assets/choices.min.css') ?>">
   <link rel="stylesheet" href="assets/style.css?v=<?php echo filemtime(__DIR__ . '/assets/style.css') ?>">
 </head>
 
@@ -334,6 +335,7 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
     </div>
   </div>
 
+  <script src="assets/choices.min.js?v=<?php echo filemtime(__DIR__ . '/assets/choices.min.js') ?>"></script>
   <script src="assets/qrcode.min.js?v=<?php echo filemtime(__DIR__ . '/assets/qrcode.min.js') ?>"></script>
   <script src="assets/app.js?v=<?php echo filemtime(__DIR__ . '/assets/app.js') ?>"></script>
 </body>

@@ -691,6 +691,105 @@ async function importPreviousMatch() {
 	}
 }
 
+function setSelectValue(el, val) {
+	if (!el) return;
+	el.value = val || "";
+	if (el._choices) {
+		try {
+			if (!val) {
+				el._choices.removeActiveItems();
+			} else {
+				el._choices.setChoiceByValue(String(val));
+			}
+		} catch (e) {
+			console.warn("setSelectValue error:", e);
+		}
+	}
+}
+
+function setSelectDisabled(el, disabled) {
+	if (!el) return;
+	el.disabled = !!disabled;
+	if (el._choices) {
+		try {
+			if (disabled) {
+				el._choices.disable();
+			} else {
+				el._choices.enable();
+			}
+		} catch (e) {
+			console.warn("setSelectDisabled error:", e);
+		}
+	}
+}
+
+function enhanceSelect(el, opts = {}) {
+	if (!el || typeof Choices === "undefined") return el;
+	if (el._choices) {
+		try {
+			el._choices.destroy();
+		} catch (e) {}
+		el._choices = null;
+	}
+
+	const searchEnabled = opts.searchEnabled !== undefined ? opts.searchEnabled : true;
+
+	const instance = new Choices(el, {
+		searchEnabled,
+		searchPlaceholderValue: opts.searchPlaceholderValue || "Search...",
+		searchResultLimit: 50,
+		itemSelectText: "",
+		shouldSort: false,
+		placeholder: true,
+		placeholderValue: null,
+		allowHTML: false,
+		position: "auto",
+		...opts,
+	});
+
+	el._choices = instance;
+
+	// Override focus to open dropdown
+	el.focus = () => {
+		if (el._choices) {
+			try {
+				el._choices.showDropdown();
+			} catch (e) {}
+		}
+	};
+
+	// Smart flip & z-index elevation when dropdown opens
+	el.addEventListener("showDropdown", () => {
+		const row = el.closest(".modal-custom-row") || el.closest("div");
+		if (row) row.style.zIndex = "50";
+
+		const container = el._choices && el._choices.containerOuter && el._choices.containerOuter.element;
+		if (container) {
+			const rect = container.getBoundingClientRect();
+			const dropdownNeededHeight = 310;
+			const spaceBelow = window.innerHeight - rect.bottom;
+			const spaceAbove = rect.top;
+
+			if (spaceBelow < dropdownNeededHeight && spaceAbove > spaceBelow) {
+				container.classList.add("is-flipped");
+			} else {
+				container.classList.remove("is-flipped");
+			}
+		}
+	});
+
+	el.addEventListener("hideDropdown", () => {
+		const row = el.closest(".modal-custom-row") || el.closest("div");
+		if (row) row.style.zIndex = "";
+		const container = el._choices && el._choices.containerOuter && el._choices.containerOuter.element;
+		if (container) {
+			container.classList.remove("is-flipped");
+		}
+	});
+
+	return el;
+}
+
 async function showMatchPickerModal(matches) {
 	let selectedIndex = -1;
 	const customContent = (container) => {
@@ -761,6 +860,7 @@ async function showMatchPickerModal(matches) {
 		updatePreview();
 		wrap.append(lbl, sel, previewBox);
 		container.append(wrap);
+		enhanceSelect(sel, { searchPlaceholderValue: "Search previous match..." });
 	};
 
 	const ok = await showModal({
@@ -2085,7 +2185,7 @@ async function openInningsOpenerModal() {
 			rowWarn.classList.add("hidden");
 			if (striker && striker === nonStriker) {
 				nonStriker = "";
-				selNon.value = "";
+				setSelectValue(selNon, "");
 			}
 		};
 		selNon.onchange = () => {
@@ -2093,7 +2193,7 @@ async function openInningsOpenerModal() {
 			rowWarn.classList.add("hidden");
 			if (nonStriker && nonStriker === striker) {
 				striker = "";
-				selStriker.value = "";
+				setSelectValue(selStriker, "");
 			}
 		};
 
@@ -2126,6 +2226,9 @@ async function openInningsOpenerModal() {
 		row3.append(selBow);
 
 		container.append(row1, row2, row3);
+		enhanceSelect(selStriker, { searchPlaceholderValue: "Search striker..." });
+		enhanceSelect(selNon, { searchPlaceholderValue: "Search non-striker..." });
+		enhanceSelect(selBow, { searchPlaceholderValue: "Search opening bowler..." });
 	};
 
 	let userExited = false;
@@ -2262,6 +2365,7 @@ async function chooseNextBowlerModal(prevBowler, defaultBowler = null) {
 
 		row.append(sel);
 		container.append(row);
+		enhanceSelect(sel, { searchPlaceholderValue: "Search bowler..." });
 	};
 
 	const ok = await showModal({
@@ -2347,7 +2451,7 @@ async function changeBattersModal() {
 			currentStriker = selStriker.value;
 			if (currentStriker && currentStriker === currentNonStriker) {
 				currentNonStriker = "";
-				selNon.value = "";
+				setSelectValue(selNon, "");
 			}
 		};
 		row1.append(selStriker);
@@ -2377,12 +2481,14 @@ async function changeBattersModal() {
 			currentNonStriker = selNon.value;
 			if (currentNonStriker && currentNonStriker === currentStriker) {
 				currentStriker = "";
-				selStriker.value = "";
+				setSelectValue(selStriker, "");
 			}
 		};
 		row2.append(selNon);
 
 		container.append(row1, row2);
+		enhanceSelect(selStriker, { searchPlaceholderValue: "Search striker..." });
+		enhanceSelect(selNon, { searchPlaceholderValue: "Search non-striker..." });
 	};
 
 	const ok = await showModal({
@@ -3590,6 +3696,12 @@ function closeModal(ok, keepHistory = false) {
 	}
 	const customEl = $("modalCustom");
 	if (customEl) {
+		customEl.querySelectorAll("select").forEach((s) => {
+			if (s._choices) {
+				try { s._choices.destroy(); } catch (e) {}
+				s._choices = null;
+			}
+		});
 		customEl.innerHTML = "";
 		customEl.classList.add("hidden");
 	}
@@ -3659,6 +3771,12 @@ function showModal({
 	$("modalFields").classList.toggle("hidden", !fields);
 	const customEl = $("modalCustom");
 	if (customEl) {
+		customEl.querySelectorAll("select").forEach((s) => {
+			if (s._choices) {
+				try { s._choices.destroy(); } catch (e) {}
+				s._choices = null;
+			}
+		});
 		customEl.innerHTML = "";
 		if (customContent) {
 			customEl.classList.remove("hidden");
@@ -4001,29 +4119,29 @@ async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 			const dVal = (selDismissal && selDismissal.value) || dismissal || "";
 			const isRunOut = dVal === "run out";
 			rowPlayer.classList.toggle("hidden", !dVal);
-			selPlayer.disabled = !isRunOut || isCurrentlyLone;
+			setSelectDisabled(selPlayer, !isRunOut || isCurrentlyLone);
 			if (!dVal) {
-				selPlayer.value = "";
+				setSelectValue(selPlayer, "");
 				dismissedPlayer = "";
 			} else if (isRunOut) {
 				if (isCurrentlyLone) {
-					selPlayer.value = striker;
+					setSelectValue(selPlayer, striker);
 					dismissedPlayer = striker;
 				} else {
-					selPlayer.value = "";
+					setSelectValue(selPlayer, "");
 					dismissedPlayer = "";
 				}
 			} else {
-				selPlayer.value = striker;
+				setSelectValue(selPlayer, striker);
 				dismissedPlayer = striker;
 			}
 			rowRuns.classList.toggle("hidden", !isRunOut);
-			selRuns.disabled = !isRunOut;
+			setSelectDisabled(selRuns, !isRunOut);
 			if (!isRunOut) {
 				runs = 0;
-				selRuns.value = "";
+				setSelectValue(selRuns, "");
 			} else {
-				selRuns.value = "";
+				setSelectValue(selRuns, "");
 				runs = null;
 			}
 			if (willBeLoneBatter) {
@@ -4054,8 +4172,14 @@ async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 			rowWarn.classList.add("hidden");
 		};
 
-		updateVisibility();
 		container.append(rowDismissal, rowPlayer, rowRuns, rowNext);
+		enhanceSelect(selDismissal, { searchEnabled: false });
+		enhanceSelect(selPlayer, { searchEnabled: false });
+		enhanceSelect(selRuns, { searchEnabled: false });
+		if (selNext) {
+			enhanceSelect(selNext, { searchPlaceholderValue: "Search incoming batter..." });
+		}
+		updateVisibility();
 	};
 
 	let modalTitle = "Fall of Wicket";
@@ -4572,6 +4696,11 @@ $("modalOk").onclick = async () => {
 					const lbl = row ? row.querySelector("label") : null;
 					alertDiv.textContent = "⚠️ Please select " + (lbl ? lbl.textContent.replace("*", "").trim() : "all required fields") + ".";
 					warnBox.classList.remove("hidden");
+				}
+				if (sel._choices) {
+					try {
+						sel._choices.showDropdown();
+					} catch (e) {}
 				}
 				return;
 			}
