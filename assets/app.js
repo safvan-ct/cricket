@@ -225,7 +225,7 @@ async function boot() {
 				location.pathname + location.search + hash,
 			);
 			try {
-				await openMatch(id, true);
+				await openMatch(id, true, tab);
 				return;
 			} catch (e) {
 				pushNavState({ page: "matches" }, "", true);
@@ -896,21 +896,22 @@ $("setupForm").onsubmit = async (e) => {
 			batting_first: batting,
 		};
 		if (editingMatch && current) {
-			const r = await api("update", "POST", body, current);
+			const matchId = current;
+			const r = await api("update", "POST", body, matchId);
 			state = r.state;
-			activeScoreTab = isComplete() ? "scorecard" : "live";
-			$("matchTitle").textContent = matchTitleText(state);
 			editingMatch = false;
-			$("setupView").classList.add("hidden");
-			$("scoreView").classList.remove("hidden");
-			pushNavState(
-				{ page: "match", matchId: current, tab: activeScoreTab },
-				"#m=" + current + (activeScoreTab === "scorecard" ? "&tab=scorecard" : ""),
-				true,
-			);
-			headerMode();
-			render();
-			startViewerPoll();
+			await loadCommonPlayers();
+
+			// Refresh scorecard page
+			const tabHash = activeScoreTab === "scorecard" ? "&tab=scorecard" : "";
+			window.location.href =
+				window.location.pathname +
+				window.location.search +
+				"#m=" +
+				matchId +
+				tabHash;
+			window.location.reload();
+			return;
 		} else {
 			const r = await api("create", "POST", body);
 			pushNavState({ page: "match", matchId: r.id, tab: "live" }, "#m=" + r.id, true);
@@ -2127,13 +2128,19 @@ async function openInningsOpenerModal() {
 		container.append(row1, row2, row3);
 	};
 
+	let userExited = false;
 	const ok = await showModal({
 		title: `${innTeam} — Innings ${state.innings} Openers`,
 		message: `Select opening batters for ${innTeam} and opening bowler for ${oppTeam}:`,
 		confirmLabel: "Start Scoring",
-		showCancel: false,
+		showCancel: true,
+		cancelLabel: "Matches",
 		showClose: false,
 		customContent: content,
+		onCancel: () => {
+			userExited = true;
+			goBackToMatches();
+		},
 		validate: () => {
 			const s = (selStriker && selStriker.value) ? selStriker.value : striker;
 			const ns = (selNon && selNon.value) ? selNon.value : nonStriker;
@@ -2174,8 +2181,12 @@ async function openInningsOpenerModal() {
 		},
 	});
 
+	if (userExited || !current || $("scoreView").classList.contains("hidden")) {
+		return;
+	}
+
 	if (!ok || !striker || !nonStriker || !bowler || striker === nonStriker) {
-		if (isAdmin && !isComplete()) {
+		if (isAdmin && !isComplete() && current && !$("scoreView").classList.contains("hidden")) {
 			setTimeout(() => {
 				openInningsOpenerModal();
 			}, 60);
@@ -2444,11 +2455,21 @@ async function ensureCreaseInitialized() {
 	await openInningsOpenerModal();
 	return isCreaseValidForCurrentInnings();
 }
-async function openMatch(id, skipHistory = false) {
+async function openMatch(id, skipHistory = false, preferredTab = null) {
 	const r = await api("get", "GET", null, id);
 	current = id;
 	state = r.state;
-	activeScoreTab = isComplete() ? "scorecard" : "live";
+	const hashTab = String(location.hash || "").includes("tab=scorecard") ? "scorecard" : null;
+	const stateTab = (history.state && history.state.tab) || null;
+	if (preferredTab) {
+		activeScoreTab = preferredTab;
+	} else if (hashTab) {
+		activeScoreTab = hashTab;
+	} else if (stateTab) {
+		activeScoreTab = stateTab;
+	} else {
+		activeScoreTab = isComplete() ? "scorecard" : "live";
+	}
 	openScorecardInningsKey = null;
 	editingMatch = false;
 	setPendingExtra("");
@@ -3515,6 +3536,7 @@ function renderCrease() {
 }
 let modalResolve = null;
 let modalValidate = null;
+let modalCancelCallback = null;
 function modalKey(e) {
 	if (e.key === "Escape" && $("modal").dataset.allowDismiss === "1")
 		closeModal(false);
@@ -3578,6 +3600,13 @@ function closeModal(ok, keepHistory = false) {
 	if ($("modalTitle")) {
 		$("modalTitle").classList.remove("hidden");
 	}
+	const cancelCb = modalCancelCallback;
+	modalCancelCallback = null;
+	if (!ok && typeof cancelCb === "function") {
+		try {
+			cancelCb();
+		} catch (e) {}
+	}
 	if (modalResolve) {
 		const r = modalResolve;
 		modalResolve = null;
@@ -3597,6 +3626,8 @@ function showModal({
 	message,
 	confirmLabel = "OK",
 	showCancel = false,
+	cancelLabel = "Cancel",
+	onCancel = null,
 	showClose = null,
 	fields = false,
 	balls = null,
@@ -3607,6 +3638,7 @@ function showModal({
 	validate = null,
 }) {
 	modalValidate = validate || null;
+	modalCancelCallback = onCancel || null;
 	const modalCard = $("modal") ? $("modal").querySelector(".modal-card") : null;
 	if (modalCard) {
 		modalCard.className = "modal-card" + (modalClass ? " " + modalClass : "");
@@ -3620,7 +3652,10 @@ function showModal({
 	const isClose = showClose !== null ? !!showClose : showCancel || !!qr;
 	$("modalClose").classList.toggle("hidden", !isClose);
 	const cancelBtn = $("modalCancel");
-	if (cancelBtn) cancelBtn.classList.toggle("hidden", !showCancel);
+	if (cancelBtn) {
+		cancelBtn.textContent = cancelLabel || "Cancel";
+		cancelBtn.classList.toggle("hidden", !showCancel);
+	}
 	$("modalFields").classList.toggle("hidden", !fields);
 	const customEl = $("modalCustom");
 	if (customEl) {
@@ -4676,7 +4711,7 @@ window.addEventListener("popstate", async (e) => {
 				startViewerPoll();
 			} else {
 				activeScoreTab = target.tab || "live";
-				await openMatch(target.matchId, true);
+				await openMatch(target.matchId, true, activeScoreTab);
 			}
 		} else if (target.page === "setup") {
 			if (target.mode === "update" && target.matchId) {
