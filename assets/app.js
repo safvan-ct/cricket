@@ -732,12 +732,12 @@ function enhanceSelect(el, opts = {}) {
 		el._choices = null;
 	}
 
-	const searchEnabled = opts.searchEnabled !== undefined ? opts.searchEnabled : true;
+	const searchEnabled = opts.searchEnabled !== undefined ? opts.searchEnabled : false;
 
 	const instance = new Choices(el, {
 		searchEnabled,
-		searchPlaceholderValue: opts.searchPlaceholderValue || "Search...",
-		searchResultLimit: 50,
+		searchResultLimit: -1,
+		renderChoiceLimit: -1,
 		itemSelectText: "",
 		shouldSort: false,
 		placeholder: true,
@@ -766,7 +766,7 @@ function enhanceSelect(el, opts = {}) {
 		const container = el._choices && el._choices.containerOuter && el._choices.containerOuter.element;
 		if (container) {
 			const rect = container.getBoundingClientRect();
-			const dropdownNeededHeight = 310;
+			const dropdownNeededHeight = 270; // 7 items max height
 			const spaceBelow = window.innerHeight - rect.bottom;
 			const spaceAbove = rect.top;
 
@@ -860,7 +860,7 @@ async function showMatchPickerModal(matches) {
 		updatePreview();
 		wrap.append(lbl, sel, previewBox);
 		container.append(wrap);
-		enhanceSelect(sel, { searchPlaceholderValue: "Search previous match..." });
+		enhanceSelect(sel);
 	};
 
 	const ok = await showModal({
@@ -2226,9 +2226,9 @@ async function openInningsOpenerModal() {
 		row3.append(selBow);
 
 		container.append(row1, row2, row3);
-		enhanceSelect(selStriker, { searchPlaceholderValue: "Search striker..." });
-		enhanceSelect(selNon, { searchPlaceholderValue: "Search non-striker..." });
-		enhanceSelect(selBow, { searchPlaceholderValue: "Search opening bowler..." });
+		enhanceSelect(selStriker);
+		enhanceSelect(selNon);
+		enhanceSelect(selBow);
 	};
 
 	let userExited = false;
@@ -2365,7 +2365,7 @@ async function chooseNextBowlerModal(prevBowler, defaultBowler = null) {
 
 		row.append(sel);
 		container.append(row);
-		enhanceSelect(sel, { searchPlaceholderValue: "Search bowler..." });
+		enhanceSelect(sel);
 	};
 
 	const ok = await showModal({
@@ -2487,8 +2487,8 @@ async function changeBattersModal() {
 		row2.append(selNon);
 
 		container.append(row1, row2);
-		enhanceSelect(selStriker, { searchPlaceholderValue: "Search striker..." });
-		enhanceSelect(selNon, { searchPlaceholderValue: "Search non-striker..." });
+		enhanceSelect(selStriker);
+		enhanceSelect(selNon);
 	};
 
 	const ok = await showModal({
@@ -3712,6 +3712,18 @@ function closeModal(ok, keepHistory = false) {
 	if ($("modalTitle")) {
 		$("modalTitle").classList.remove("hidden");
 	}
+	const fieldsEl = $("modalFields");
+	if (fieldsEl) {
+		fieldsEl.classList.remove("overthrow-mode", "wide-nb-mode");
+	}
+	const wicketRow = $("modalWicketRow");
+	if (wicketRow) {
+		wicketRow.classList.remove("is-checked");
+	}
+	const wicketBox = $("modalWicket");
+	if (wicketBox) {
+		wicketBox.checked = false;
+	}
 	const cancelCb = modalCancelCallback;
 	modalCancelCallback = null;
 	if (!ok && typeof cancelCb === "function") {
@@ -3839,11 +3851,24 @@ function showModal({
 	}
 	if (fields) {
 		const ovr = $("modalFields").classList.contains("overthrow-mode");
-		const val = ovr ? "1" : "0";
-		const r = document.querySelector(
-			'input[name="modalAddon"][value="' + val + '"]',
-		);
-		if (r) r.checked = true;
+		const isWideNb = $("modalFields").classList.contains("wide-nb-mode");
+		if (isWideNb) {
+			document.querySelectorAll('input[name="modalAddon"]').forEach((r) => {
+				r.checked = false;
+				r._wasChecked = false;
+				const parentOpt = r.closest(".modal-addon-opt");
+				if (parentOpt) parentOpt.classList.remove("is-checked");
+			});
+		} else {
+			const val = ovr ? "1" : "0";
+			document.querySelectorAll('input[name="modalAddon"]').forEach((r) => {
+				const isTarget = r.value === val;
+				r.checked = isTarget;
+				r._wasChecked = isTarget;
+				const parentOpt = r.closest(".modal-addon-opt");
+				if (parentOpt) parentOpt.classList.toggle("is-checked", isTarget);
+			});
+		}
 		$("modalAddonLabel").textContent = ovr ? "Runs completed" : "Add-on runs";
 	}
 	$("modal").dataset.allowDismiss =
@@ -4173,11 +4198,11 @@ async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 		};
 
 		container.append(rowDismissal, rowPlayer, rowRuns, rowNext);
-		enhanceSelect(selDismissal, { searchEnabled: false });
-		enhanceSelect(selPlayer, { searchEnabled: false });
-		enhanceSelect(selRuns, { searchEnabled: false });
+		enhanceSelect(selDismissal);
+		enhanceSelect(selPlayer);
+		enhanceSelect(selRuns);
 		if (selNext) {
-			enhanceSelect(selNext, { searchPlaceholderValue: "Search incoming batter..." });
+			enhanceSelect(selNext);
 		}
 		updateVisibility();
 	};
@@ -4505,7 +4530,7 @@ function commitExtra(type, additional, wicket) {
 function addonValue() {
 	const el = document.querySelector('input[name="modalAddon"]:checked');
 	const n = el ? parseInt(el.value, 10) : 0;
-	return Number.isNaN(n) ? 0 : Math.min(6, Math.max(0, n));
+	return Number.isNaN(n) ? 0 : Math.min(7, Math.max(0, n));
 }
 async function openDeliveryPopup(type) {
 	if (!isAdmin || !current || isComplete()) return;
@@ -4520,9 +4545,11 @@ async function openDeliveryPopup(type) {
 		return;
 	}
 	const isOvr = type === "overthrow";
+	const isWideOrNb = type === "wide" || type === "no-ball";
 	$("modalWicket").checked = false;
-	$("modalWicketRow").classList.remove("hidden");
+	$("modalWicketRow").classList.remove("hidden", "is-checked");
 	$("modalFields").classList.toggle("overthrow-mode", isOvr);
+	$("modalFields").classList.toggle("wide-nb-mode", isWideOrNb);
 	const msg = isOvr
 		? "Runs completed, then 4 overthrows."
 		: "Choose add-on runs, then mark the delivery.";
@@ -4549,6 +4576,31 @@ async function openDeliveryPopup(type) {
 	} else {
 		commitExtra(type, additional, false);
 	}
+}
+document.querySelectorAll('.modal-addon input[name="modalAddon"]').forEach((r) => {
+	r.addEventListener("click", function () {
+		const parentOpt = this.closest(".modal-addon-opt");
+		if (this._wasChecked) {
+			this.checked = false;
+			this._wasChecked = false;
+			if (parentOpt) parentOpt.classList.remove("is-checked");
+		} else {
+			document.querySelectorAll('.modal-addon input[name="modalAddon"]').forEach((other) => {
+				other._wasChecked = false;
+				const otherParent = other.closest(".modal-addon-opt");
+				if (otherParent) otherParent.classList.remove("is-checked");
+			});
+			this._wasChecked = true;
+			if (parentOpt) parentOpt.classList.add("is-checked");
+		}
+	});
+});
+const modalWicketInput = $("modalWicket");
+if (modalWicketInput) {
+	modalWicketInput.addEventListener("change", function () {
+		const row = $("modalWicketRow");
+		if (row) row.classList.toggle("is-checked", this.checked);
+	});
 }
 document.querySelectorAll("[data-run]").forEach(
 	(b) =>

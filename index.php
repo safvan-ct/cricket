@@ -317,15 +317,25 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
       <div id="modalFields" class="modal-fields hidden">
         <p id="modalAddonLabel" class="modal-addon-label">Add-on runs</p>
         <div class="modal-addon" role="radiogroup" aria-label="Add-on runs">
-          <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="0" checked>0</label>
-          <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="1">1</label>
-          <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="2">2</label>
-          <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="3">3</label>
-          <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="4">4</label>
-          <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="5">5</label>
-          <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="6">6</label>
+          <label class="modal-addon-opt" data-addon="0"><input type="radio" name="modalAddon" value="0">0</label>
+          <label class="modal-addon-opt" data-addon="1"><input type="radio" name="modalAddon" value="1">1</label>
+          <label class="modal-addon-opt" data-addon="2"><input type="radio" name="modalAddon" value="2">2</label>
+          <label class="modal-addon-opt" data-addon="3"><input type="radio" name="modalAddon" value="3">3</label>
+          <label class="modal-addon-opt" data-addon="4"><input type="radio" name="modalAddon" value="4">4</label>
+          <label class="modal-addon-opt" data-addon="5"><input type="radio" name="modalAddon" value="5">5</label>
+          <label class="modal-addon-opt" data-addon="6"><input type="radio" name="modalAddon" value="6">6</label>
+          <label class="modal-addon-opt" data-addon="7"><input type="radio" name="modalAddon" value="7">7</label>
         </div>
-        <label id="modalWicketRow" class="modal-check"><input id="modalWicket" type="checkbox"> Wicket</label>
+        <label id="modalWicketRow" class="modal-check">
+          <span class="wicket-check-content">
+            <span class="wicket-check-icon">☝️</span>
+            <span class="wicket-check-text">
+              <strong>Wicket</strong>
+              <small>(Run out, stumping, hit wicket)</small>
+            </span>
+          </span>
+          <input id="modalWicket" type="checkbox">
+        </label>
       </div>
       <div id="modalCustom" class="modal-custom hidden"></div>
       <div class="modal-actions">

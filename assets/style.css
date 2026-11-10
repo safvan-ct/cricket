@@ -1389,27 +1389,106 @@ td:first-child {
     display: none
 }
 
+.modal-addon-opt.is-checked,
 .modal-addon-opt:has(input:checked) {
     background: var(--blue);
     color: #fff
 }
 
+.modal-fields.wide-nb-mode .modal-addon-opt[data-addon="0"],
+.modal-fields.wide-nb-mode .modal-addon-opt:has([value="0"]) {
+    display: none !important;
+}
+
+.modal-fields:not(.wide-nb-mode) .modal-addon-opt[data-addon="7"],
+.modal-fields:not(.wide-nb-mode) .modal-addon-opt:has([value="7"]) {
+    display: none !important;
+}
+
+.modal-fields.overthrow-mode .modal-addon-opt[data-addon="0"],
+.modal-fields.overthrow-mode .modal-addon-opt[data-addon="4"],
+.modal-fields.overthrow-mode .modal-addon-opt[data-addon="5"],
+.modal-fields.overthrow-mode .modal-addon-opt[data-addon="6"],
+.modal-fields.overthrow-mode .modal-addon-opt[data-addon="7"],
 .modal-fields.overthrow-mode .modal-addon-opt:has([value="0"]),
 .modal-fields.overthrow-mode .modal-addon-opt:has([value="4"]),
 .modal-fields.overthrow-mode .modal-addon-opt:has([value="5"]),
-.modal-fields.overthrow-mode .modal-addon-opt:has([value="6"]) {
-    display: none
+.modal-fields.overthrow-mode .modal-addon-opt:has([value="6"]),
+.modal-fields.overthrow-mode .modal-addon-opt:has([value="7"]) {
+    display: none !important;
 }
 
 .modal-check {
+    display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 8px;
-    font-size: 12px
+    justify-content: space-between;
+    padding: 11px 14px;
+    background: #fef2f2;
+    border: 1.5px solid #fca5a5;
+    border-radius: 10px;
+    cursor: pointer;
+    margin-top: 6px;
+    user-select: none;
+    transition: background .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+
+.modal-check:hover {
+    background: #fee2e2;
+    border-color: #f87171;
+}
+
+.wicket-check-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.wicket-check-icon {
+    font-size: 18px;
+    line-height: 1;
+}
+
+.wicket-check-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    text-align: left;
+}
+
+.wicket-check-text strong {
+    font-size: 14px;
+    font-weight: 700;
+    color: #991b1b;
+}
+
+.wicket-check-text small {
+    font-size: 11px;
+    font-weight: 600;
+    color: #b91c1c;
+    opacity: 0.85;
 }
 
 .modal-check input {
-    width: auto
+    width: 20px;
+    height: 20px;
+    accent-color: var(--red);
+    cursor: pointer;
+    margin: 0;
+}
+
+.modal-check.is-checked,
+.modal-check:has(input:checked) {
+    background: var(--red);
+    border-color: #991b1b;
+    box-shadow: 0 4px 14px rgba(220, 38, 38, 0.3);
+}
+
+.modal-check.is-checked .wicket-check-text strong,
+.modal-check.is-checked .wicket-check-text small,
+.modal-check:has(input:checked) .wicket-check-text strong,
+.modal-check:has(input:checked) .wicket-check-text small {
+    color: #ffffff;
 }
 
 .header-actions {
