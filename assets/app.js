@@ -2131,6 +2131,17 @@ function isCreaseValidForCurrentInnings(cr = null) {
 		if (s === ns) return false;
 		if (!bRoster.includes(ns)) return false;
 	}
+
+	// A bowler cannot bowl consecutive overs
+	const prevBowler = getPreviousOverBowler();
+	if (prevBowler && formatPlayerName(prevBowler) === b) {
+		const overs = groupOvers(state.deliveries || []);
+		const currentOver = overs[overs.length - 1];
+		if (!currentOver || currentOver.complete || !currentOver.balls || currentOver.balls.length === 0) {
+			return false;
+		}
+	}
+
 	return true;
 }
 
@@ -2332,7 +2343,7 @@ async function openInningsOpenerModal() {
 	} catch (e) {}
 	render();
 }
-async function chooseNextBowlerModal(prevBowler, defaultBowler = null) {
+async function chooseNextBowlerModal(prevBowler, defaultBowler = null, canDismiss = false) {
 	if (!isAdmin || !current || isComplete()) return;
 	const roster = bowlingRoster();
 	const curBowler = defaultBowler
@@ -2390,12 +2401,16 @@ async function chooseNextBowlerModal(prevBowler, defaultBowler = null) {
 			? `${prevBowlerFormatted} just completed the over. Choose the next bowler (cannot bowl consecutive overs):`
 			: "Choose the active bowler:",
 		confirmLabel: "Confirm Bowler",
-		showCancel: false,
-		showClose: true,
+		showCancel: canDismiss,
+		showClose: canDismiss,
 		customContent: content,
 		validate: () => {
 			if (!selected) {
 				showError("Please select a bowler to continue.");
+				return false;
+			}
+			if (prevBowlerFormatted && selected === prevBowlerFormatted) {
+				showError(`${prevBowlerFormatted} cannot bowl consecutive overs.`);
 				return false;
 			}
 			return true;
@@ -2413,10 +2428,7 @@ async function chooseNextBowlerModal(prevBowler, defaultBowler = null) {
 async function changeBattersModal() {
 	if (!isAdmin || !current || !state || isComplete()) return;
 	const initialized = await ensureCreaseInitialized();
-	if (!initialized || !isCreaseValidForCurrentInnings()) {
-		await openInningsOpenerModal();
-		if (!isCreaseValidForCurrentInnings()) return;
-	}
+	if (!initialized || !isCreaseValidForCurrentInnings()) return;
 	const cr = state.crease || {};
 	const bRoster = battingRoster();
 	const deliveries = state.deliveries || [];
@@ -2567,6 +2579,14 @@ async function ensureCreaseInitialized() {
 	}
 	if (isCreaseValidForCurrentInnings()) {
 		return true;
+	}
+	const cr = state.crease || {};
+	const prevB = getPreviousOverBowler();
+	const bRoster = battingRoster().map(formatPlayerName);
+	const hasValidStriker = cr.striker && bRoster.includes(formatPlayerName(cr.striker));
+	if (hasValidStriker && prevB) {
+		await chooseNextBowlerModal(prevB, null, false);
+		return isCreaseValidForCurrentInnings();
 	}
 	const last = deliveries[deliveries.length - 1];
 	if (last && last.crease_after && isCreaseValidForCurrentInnings(last.crease_after)) {
@@ -3622,7 +3642,7 @@ function renderCrease() {
 	const isLone = !cr.non_striker;
 	const nsName = isLone ? "" : (cr.non_striker ? formatPlayerName(cr.non_striker) : "");
 	const bName = cr.bowler ? formatPlayerName(cr.bowler) : "";
-	if (!sName || !bName) {
+	if (!sName) {
 		hud.classList.add("hidden");
 		return;
 	}
@@ -3631,7 +3651,7 @@ function renderCrease() {
 
 	const sStat = c.batBalls[sName] || { r: 0, b: 0, f: 0, s: 0 };
 	const nsStat = nsName ? (c.batBalls[nsName] || { r: 0, b: 0, f: 0, s: 0 }) : { r: 0, b: 0, f: 0, s: 0 };
-	const bStat = c.bowl[bName] || { r: 0, w: 0, b: 0, maidens: 0 };
+	const bStat = bName ? (c.bowl[bName] || { r: 0, w: 0, b: 0, maidens: 0 }) : null;
 
 	$("strikerName").textContent = sName;
 	$("strikerStat").textContent = `${sStat.r} (${sStat.b}) · 4s: ${sStat.f} · 6s: ${sStat.s}`;
@@ -3645,10 +3665,15 @@ function renderCrease() {
 		}
 	}
 
-	const bOvers = oversText(bStat.b);
-	const econ = bStat.b > 0 ? ((bStat.r / bStat.b) * 6).toFixed(2) : "0.00";
-	$("bowlerName").textContent = bName;
-	$("bowlerStat").textContent = `${bOvers} - ${bStat.maidens || 0} - ${bStat.r} - ${bStat.w} · Econ: ${econ}`;
+	if (bName && bStat) {
+		const bOvers = oversText(bStat.b);
+		const econ = bStat.b > 0 ? ((bStat.r / bStat.b) * 6).toFixed(2) : "0.00";
+		$("bowlerName").textContent = bName;
+		$("bowlerStat").textContent = `${bOvers} - ${bStat.maidens || 0} - ${bStat.r} - ${bStat.w} · Econ: ${econ}`;
+	} else {
+		$("bowlerName").textContent = "Select Bowler";
+		$("bowlerStat").textContent = "Tap Change to pick next bowler";
+	}
 
 	$("swapStrikeBtn").classList.toggle("hidden", !isAdmin || isComplete() || isLone);
 	$("changeBowlerBtn").classList.toggle("hidden", !isAdmin || isComplete());
@@ -3974,10 +3999,7 @@ async function notifyPhaseChange(overDetails = null) {
 async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 	if (!isAdmin || !current || isComplete()) return;
 	const initialized = await ensureCreaseInitialized();
-	if (!initialized || !isCreaseValidForCurrentInnings()) {
-		await openInningsOpenerModal();
-		if (!isCreaseValidForCurrentInnings()) return;
-	}
+	if (!initialized || !isCreaseValidForCurrentInnings()) return;
 	const cr = state.crease || {};
 	const striker = cr.striker ? formatPlayerName(cr.striker) : "";
 	const nonStriker = cr.non_striker ? formatPlayerName(cr.non_striker) : null;
@@ -4340,10 +4362,7 @@ async function recordBallWithRotation({
 }) {
 	if (!isAdmin || !current || isComplete()) return;
 	const initialized = await ensureCreaseInitialized();
-	if (!initialized || !isCreaseValidForCurrentInnings()) {
-		await openInningsOpenerModal();
-		if (!isCreaseValidForCurrentInnings()) return;
-	}
+	if (!initialized || !isCreaseValidForCurrentInnings()) return;
 
 	try {
 		const prev = state;
@@ -4498,7 +4517,11 @@ async function recordBallWithRotation({
 			);
 		} else if (closed && !isComplete()) {
 			await notifyOverComplete(closed, endedOverBalls(closed, r.state));
-			await chooseNextBowlerModal(curBowler);
+			if (state.crease) {
+				state.crease.bowler = "";
+			}
+			render();
+			await chooseNextBowlerModal(curBowler, null, false);
 		} else {
 			$("actionMessage").textContent = "Delivery recorded.";
 		}
@@ -4551,10 +4574,7 @@ function addonValue() {
 async function openDeliveryPopup(type) {
 	if (!isAdmin || !current || isComplete()) return;
 	const initialized = await ensureCreaseInitialized();
-	if (!initialized || !isCreaseValidForCurrentInnings()) {
-		await openInningsOpenerModal();
-		if (!isCreaseValidForCurrentInnings()) return;
-	}
+	if (!initialized || !isCreaseValidForCurrentInnings()) return;
 	const isWicket = type === "wicket";
 	if (isWicket) {
 		await openWicketDeliveryModal("");
@@ -4631,10 +4651,7 @@ document
 $("swapStrikeBtn").onclick = async () => {
 	if (!isAdmin || !current || !state || isComplete()) return;
 	const initialized = await ensureCreaseInitialized();
-	if (!initialized || !isCreaseValidForCurrentInnings()) {
-		await openInningsOpenerModal();
-		if (!isCreaseValidForCurrentInnings()) return;
-	}
+	if (!initialized || !isCreaseValidForCurrentInnings()) return;
 	if (!state.crease || !state.crease.non_striker) return;
 	const s = state.crease.striker;
 	const ns = state.crease.non_striker;
@@ -4652,13 +4669,10 @@ const changeBatBtn = $("changeBattersBtn");
 if (changeBatBtn) changeBatBtn.onclick = changeBattersModal;
 $("changeBowlerBtn").onclick = async () => {
 	if (!isAdmin || !current || !state || isComplete()) return;
-	const initialized = await ensureCreaseInitialized();
-	if (!initialized || !isCreaseValidForCurrentInnings()) {
-		await openInningsOpenerModal();
-		if (!isCreaseValidForCurrentInnings()) return;
-	}
 	const prevBowler = getPreviousOverBowler();
-	await chooseNextBowlerModal(prevBowler, (state.crease && state.crease.bowler) || null);
+	const curBowler = state.crease && state.crease.bowler ? state.crease.bowler : null;
+	const canDismiss = isCreaseValidForCurrentInnings();
+	await chooseNextBowlerModal(prevBowler, curBowler, canDismiss);
 };
 $("undo").onclick = async () => {
 	if (!state) return;
