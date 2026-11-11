@@ -689,7 +689,8 @@ button {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-top: 2px
+    margin-top: 2px;
+    flex-wrap: wrap;
 }
 
 .match-score b {
@@ -712,6 +713,26 @@ button {
 .match-tag.live {
     background: var(--gold);
     color: #002868
+}
+
+.match-need-pill {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .2px;
+    padding: 3px 8px;
+    border-radius: 99px;
+    background: #e0f2fe;
+    color: #0369a1;
+    border: 1px solid #bae6fd;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    white-space: nowrap;
+}
+
+.match-need-pill strong {
+    color: #0c4a6e;
+    font-weight: 800;
 }
 
 .match-actions {

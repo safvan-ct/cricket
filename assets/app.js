@@ -1112,6 +1112,23 @@ function makeMatchCard(m) {
 		tag.textContent = done ? (s.result && s.result.text) || "Complete" : "Live";
 		sub.className = "match-score";
 		sub.append(score, tag);
+
+		if (s.innings === 2 && !done) {
+			const target = s.target || (s.innings_1 && s.innings_1.total !== undefined ? s.innings_1.total + 1 : null);
+			if (target) {
+				const need = Math.max(0, target - st.total);
+				const totalBalls = (s.overs_limit || 0) * 6;
+				const ballsLeft = totalBalls > 0 ? Math.max(0, totalBalls - st.legal) : 0;
+				const needTag = document.createElement("span");
+				needTag.className = "match-need-pill";
+				needTag.title = `Target: ${target} runs`;
+				needTag.innerHTML = ballsLeft > 0
+					? `Need <strong>${need}</strong> from <strong>${ballsLeft}</strong>b`
+					: `Need <strong>${need}</strong> runs`;
+				sub.append(needTag);
+			}
+		}
+
 		info.append(sub);
 	}
 	info.prepend(name);
