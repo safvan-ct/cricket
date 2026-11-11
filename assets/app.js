@@ -696,11 +696,14 @@ function setSelectValue(el, val) {
 	el.value = val || "";
 	if (el._choices) {
 		try {
+			const wasDisabled = el._choices.containerOuter && el._choices.containerOuter.isDisabled;
+			if (wasDisabled) el._choices.enable();
 			if (!val) {
 				el._choices.removeActiveItems();
 			} else {
 				el._choices.setChoiceByValue(String(val));
 			}
+			if (wasDisabled) el._choices.disable();
 		} catch (e) {
 			console.warn("setSelectValue error:", e);
 		}
@@ -4144,7 +4147,6 @@ async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 			const dVal = (selDismissal && selDismissal.value) || dismissal || "";
 			const isRunOut = dVal === "run out";
 			rowPlayer.classList.toggle("hidden", !dVal);
-			setSelectDisabled(selPlayer, !isRunOut || isCurrentlyLone);
 			if (!dVal) {
 				setSelectValue(selPlayer, "");
 				dismissedPlayer = "";
@@ -4160,6 +4162,7 @@ async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 				setSelectValue(selPlayer, striker);
 				dismissedPlayer = striker;
 			}
+			setSelectDisabled(selPlayer, !isRunOut || isCurrentlyLone);
 			rowRuns.classList.toggle("hidden", !isRunOut);
 			setSelectDisabled(selRuns, !isRunOut);
 			if (!isRunOut) {
