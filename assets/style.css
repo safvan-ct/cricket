@@ -397,16 +397,15 @@ select option:disabled {
     border-bottom: none;
 }
 
-.choices__list--dropdown .choices__item--selectable.is-highlighted {
-    background-color: #eef5fc;
-    color: var(--blue);
-    font-weight: 600;
+.choices__list--dropdown .choices__item--selectable.is-highlighted:not(.is-selected) {
+    background-color: #f1f5f9;
+    color: var(--ink);
 }
 
-.choices__list--dropdown .choices__item[aria-selected="true"] {
-    background-color: #e0effe;
-    color: var(--blue);
-    font-weight: 700;
+.choices__list--dropdown .choices__item--selectable.is-selected {
+    background-color: #e0effe !important;
+    color: var(--blue) !important;
+    font-weight: 700 !important;
 }
 
 .choices__list--dropdown .choices__item--disabled {

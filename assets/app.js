@@ -747,6 +747,7 @@ function enhanceSelect(el, opts = {}) {
 		placeholderValue: null,
 		allowHTML: false,
 		position: "auto",
+		closeDropdownOnSelect: true,
 		...opts,
 	});
 
@@ -777,6 +778,18 @@ function enhanceSelect(el, opts = {}) {
 				container.classList.add("is-flipped");
 			} else {
 				container.classList.remove("is-flipped");
+			}
+		}
+
+		if (el._choices) {
+			const dropdown = el._choices.dropdown && el._choices.dropdown.element;
+			if (dropdown) {
+				const selectedEl = dropdown.querySelector(".choices__item--selectable.is-selected");
+				if (selectedEl) {
+					try {
+						el._choices._highlightChoice(selectedEl);
+					} catch (e) {}
+				}
 			}
 		}
 	});
