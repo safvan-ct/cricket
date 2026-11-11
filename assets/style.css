@@ -1332,7 +1332,46 @@ td:first-child {
     margin: 0 0 8px;
     color: var(--muted);
     font-size: 14px;
-    line-height: 1.45
+    line-height: 1.45;
+    white-space: pre-line;
+}
+
+.modal-target-badge {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: #f0f7ff;
+    border: 1.5px solid var(--line);
+    border-radius: 10px;
+    color: var(--ink);
+    font-size: 13.5px;
+    line-height: 1.4;
+    text-align: left;
+}
+
+.modal-target-badge .target-pill {
+    background: var(--blue);
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 12.5px;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
+}
+
+.modal-target-badge .need-text {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.modal-target-badge .need-text strong {
+    color: var(--blue);
+    font-weight: 700;
 }
 
 .modal-actions {

@@ -2258,10 +2258,33 @@ async function openInningsOpenerModal() {
 		enhanceSelect(selBow);
 	};
 
+	let msg = `Select opening batters for ${innTeam} and opening bowler for ${oppTeam}:`;
+	let msgHtml = null;
+
+	const target = state.target || (state.innings_1 && state.innings_1.total !== undefined ? state.innings_1.total + 1 : null);
+	if (state.innings === 2 && target) {
+		const c = calc();
+		const need = Math.max(0, target - (c.total || 0));
+		const totalBalls = (state.overs_limit || 0) * 6;
+		const ballsLeft = totalBalls > 0 ? Math.max(0, totalBalls - (c.legal || 0)) : 0;
+		const rrr = ballsLeft > 0 ? (need / (ballsLeft / 6)).toFixed(2) : null;
+		const ballsText = ballsLeft > 0 ? ` from ${ballsLeft} balls` : "";
+		const rrrText = rrr ? ` · RRR: ${rrr}` : "";
+
+		msg += `\n\nTarget: ${target} runs · Need ${need} runs${ballsText} to win${rrrText}`;
+
+		msgHtml = `Select opening batters for <strong>${innTeam}</strong> and opening bowler for <strong>${oppTeam}</strong>:
+		<span class="modal-target-badge">
+			<span class="target-pill">Target: ${target}</span>
+			<span class="need-text">Need <strong>${need}</strong> runs${ballsLeft > 0 ? ` from <strong>${ballsLeft}</strong> balls` : " to win"}${rrr ? ` · RRR <strong>${rrr}</strong>` : ""}</span>
+		</span>`;
+	}
+
 	let userExited = false;
 	const ok = await showModal({
 		title: `${innTeam} — Innings ${state.innings} Openers`,
-		message: `Select opening batters for ${innTeam} and opening bowler for ${oppTeam}:`,
+		message: msg,
+		messageHtml: msgHtml,
 		confirmLabel: "Start Scoring",
 		showCancel: true,
 		cancelLabel: "Matches",
@@ -3789,6 +3812,7 @@ function closeModal(ok, keepHistory = false) {
 function showModal({
 	title,
 	message,
+	messageHtml = null,
 	confirmLabel = "OK",
 	showCancel = false,
 	cancelLabel = "Cancel",
@@ -3812,7 +3836,13 @@ function showModal({
 		$("modalTitle").textContent = title || "";
 		$("modalTitle").classList.toggle("hidden", !title);
 	}
-	$("modalMessage").textContent = message;
+	if ($("modalMessage")) {
+		if (messageHtml) {
+			$("modalMessage").innerHTML = messageHtml;
+		} else {
+			$("modalMessage").textContent = message || "";
+		}
+	}
 	$("modalOk").textContent = confirmLabel;
 	const isClose = showClose !== null ? !!showClose : showCancel || !!qr;
 	$("modalClose").classList.toggle("hidden", !isClose);
