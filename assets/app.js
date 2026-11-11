@@ -4042,12 +4042,12 @@ async function openWicketDeliveryModal(extraType = "", initialRuns = 0) {
 		optDismissalDef.selected = true;
 		selDismissal.append(optDismissalDef);
 
-		const dismissalList =
-			extraType === "wide"
-				? ["run out", "stumped", "hit wicket", "bowled", "caught", "lbw"]
-				: extraType === "no-ball"
-				? ["run out", "hit wicket", "bowled", "caught", "lbw", "stumped"]
-				: ["bowled", "caught", "lbw", "run out", "stumped", "hit wicket"];
+		const isWideOrNb = extraType === "wide" || extraType === "no-ball";
+		const dismissalList = isWideOrNb
+			? ["run out", "stumped", "hit wicket"]
+			: extraType === "overthrow"
+			? ["run out"]
+			: ["bowled", "caught", "lbw", "run out", "stumped", "hit wicket"];
 
 		dismissalList.forEach((d) => {
 			const opt = document.createElement("option");
