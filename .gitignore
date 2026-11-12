@@ -1,1 +1,4 @@
 .env
+storage/sessions/*
+!storage/sessions/.gitignore
+!storage/sessions/.htaccess

@@ -2,6 +2,8 @@
 $configPath = __DIR__ . '/config/config.php';
 $config = file_exists($configPath) ? require $configPath : [];
 $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
+$swPath = __DIR__ . '/sw.js';
+$swVersion = file_exists($swPath) ? (string)filemtime($swPath) : (string)time();
 ?>
 <!doctype html>
 <html lang="en">
@@ -19,7 +21,7 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
   <link rel="stylesheet" href="assets/style.css?v=<?php echo filemtime(__DIR__ . '/assets/style.css') ?>">
 </head>
 
-<body data-qr-url="<?php echo htmlspecialchars($qrUrl, ENT_QUOTES, 'UTF-8'); ?>">
+<body data-qr-url="<?php echo htmlspecialchars($qrUrl, ENT_QUOTES, 'UTF-8'); ?>" data-sw-version="<?php echo htmlspecialchars($swVersion, ENT_QUOTES, 'UTF-8'); ?>">
   <header>
     <div class="brand"><span class="ball">●</span>
       <div><b>CRICKET</b><small>LIVE SCOREBOARD</small></div>

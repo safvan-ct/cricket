@@ -1,7 +1,56 @@
 <?php
 
 declare(strict_types=1);
+
+$sessionLifetime = 30 * 86400; // 30 days
+@ini_set('session.gc_maxlifetime', (string)$sessionLifetime);
+@ini_set('session.cookie_lifetime', (string)$sessionLifetime);
+
+$sessionSavePath = __DIR__ . '/../storage/sessions';
+if (!is_dir($sessionSavePath)) {
+  @mkdir($sessionSavePath, 0750, true);
+  if (is_dir($sessionSavePath)) {
+    @file_put_contents($sessionSavePath . '/.htaccess', "Require all denied\nDeny from all\n");
+  }
+}
+if (is_dir($sessionSavePath) && is_writable($sessionSavePath)) {
+  @session_save_path($sessionSavePath);
+}
+
+$isHttps = (
+  (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+  (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string)$_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') ||
+  (!empty($_SERVER['HTTP_CF_VISITOR']) && str_contains((string)$_SERVER['HTTP_CF_VISITOR'], '"https"')) ||
+  (!empty($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443)
+);
+
+session_name('cricket_admin_session');
+session_set_cookie_params([
+  'lifetime' => $sessionLifetime,
+  'path' => '/',
+  'domain' => '',
+  'secure' => $isHttps,
+  'httponly' => true,
+  'samesite' => 'Lax'
+]);
+
 session_start();
+
+function refreshAdminSessionCookie(int $lifetime, bool $isHttps): void
+{
+  if (!empty($_SESSION['cricket_admin'])) {
+    setcookie(session_name(), session_id(), [
+      'expires' => time() + $lifetime,
+      'path' => '/',
+      'domain' => '',
+      'secure' => $isHttps,
+      'httponly' => true,
+      'samesite' => 'Lax'
+    ]);
+  }
+}
+
+refreshAdminSessionCookie($sessionLifetime, $isHttps);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
@@ -35,14 +84,51 @@ if ($action === 'login') {
   if (!hash_equals((string)$config['admin_password'], (string)($b['password'] ?? ''))) respond(['error' => 'Incorrect password'], 401);
   session_regenerate_id(true);
   $_SESSION['cricket_admin'] = true;
+  $_SESSION['cricket_logged_at'] = time();
+
+  setcookie(session_name(), session_id(), [
+    'expires' => time() + $sessionLifetime,
+    'path' => '/',
+    'domain' => '',
+    'secure' => $isHttps,
+    'httponly' => true,
+    'samesite' => 'Lax'
+  ]);
+
   respond(['ok' => true]);
 }
 if ($action === 'status') {
   $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
-  respond(['authenticated' => !empty($_SESSION['cricket_admin']), 'app_url' => $qrUrl]);
+  $auth = !empty($_SESSION['cricket_admin']);
+  if ($auth) {
+    setcookie(session_name(), session_id(), [
+      'expires' => time() + $sessionLifetime,
+      'path' => '/',
+      'domain' => '',
+      'secure' => $isHttps,
+      'httponly' => true,
+      'samesite' => 'Lax'
+    ]);
+  }
+  respond(['authenticated' => $auth, 'app_url' => $qrUrl]);
 }
 if ($action === 'logout') {
   $_SESSION = [];
+  if (ini_get('session.use_cookies')) {
+    $params = session_get_cookie_params();
+    setcookie(
+      session_name(),
+      '',
+      [
+        'expires' => time() - 42000,
+        'path' => $params['path'] ?? '/',
+        'domain' => $params['domain'] ?? '',
+        'secure' => $params['secure'] ?? false,
+        'httponly' => $params['httponly'] ?? true,
+        'samesite' => $params['samesite'] ?? 'Lax'
+      ]
+    );
+  }
   session_destroy();
   respond(['ok' => true]);
 }

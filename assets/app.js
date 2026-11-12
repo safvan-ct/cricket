@@ -21,9 +21,17 @@ async function api(action, method = "GET", data = null, id = null) {
 		method,
 		headers: data ? { "Content-Type": "application/json" } : {},
 		body: data ? JSON.stringify(data) : undefined,
+		credentials: "same-origin",
 	});
 	const j = await r.json();
-	if (!r.ok) throw new Error(j.error || "Request failed");
+	if (!r.ok) {
+		if (r.status === 401 && action !== "login") {
+			isAdmin = false;
+			localStorage.removeItem("cricket_admin_logged");
+			applyRole();
+		}
+		throw new Error(j.error || "Request failed");
+	}
 	return j;
 }
 function show(id) {
@@ -105,16 +113,33 @@ function applyRole() {
 }
 async function boot() {
 	if ("serviceWorker" in navigator) {
+		const swVer = (document.body && document.body.dataset && document.body.dataset.swVersion) || "";
+		const swUrl = swVer ? `sw.js?v=${encodeURIComponent(swVer)}` : "sw.js";
 		navigator.serviceWorker
-			.register("sw.js", { updateViaCache: "none" })
+			.register(swUrl, { updateViaCache: "none" })
+			.then((reg) => {
+				if (reg) {
+					reg.update().catch(() => {});
+				}
+			})
 			.catch(() => {});
+	}
+	const cachedAdmin = localStorage.getItem("cricket_admin_logged") === "1";
+	if (cachedAdmin) {
+		isAdmin = true;
+		applyRole();
 	}
 	try {
 		const s = await api("status");
 		isAdmin = !!s.authenticated;
+		if (isAdmin) {
+			localStorage.setItem("cricket_admin_logged", "1");
+		} else {
+			localStorage.removeItem("cricket_admin_logged");
+		}
 		if (s && s.app_url && document.body) document.body.dataset.qrUrl = s.app_url;
 	} catch (e) {
-		isAdmin = false;
+		isAdmin = cachedAdmin;
 	}
 	applyRole();
 	const id = readScoreId();
@@ -166,6 +191,7 @@ $("loginForm").onsubmit = async (e) => {
 		await api("login", "POST", { password: $("password").value });
 		$("password").value = "";
 		isAdmin = true;
+		localStorage.setItem("cricket_admin_logged", "1");
 		applyRole();
 		forgetMatch();
 		show("app");
@@ -176,8 +202,11 @@ $("loginForm").onsubmit = async (e) => {
 };
 $("logout").onclick = async () => {
 	stopPoll();
-	await api("logout", "POST", {});
+	try {
+		await api("logout", "POST", {});
+	} catch (e) {}
 	isAdmin = false;
+	localStorage.removeItem("cricket_admin_logged");
 	current = null;
 	applyRole();
 	forgetMatch();
