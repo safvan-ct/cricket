@@ -203,7 +203,7 @@ function fillSetup(mode) {
 	$("setupSubmit").textContent = editingMatch ? "Save" : "Create match";
 	if (!editingMatch) {
 		$("teamA").value = "PAREL";
-		$("teamB").value = "BNA";
+		$("teamB").value = "BNI";
 		$("playersA").value = 7;
 		$("playersB").value = 7;
 		$("overs").value = 6;
@@ -324,9 +324,9 @@ function matchDayLabel(key) {
 	today.setHours(0, 0, 0, 0);
 	const diff = Math.round((today - d) / 86400000);
 	const nice = d.toLocaleDateString(undefined, {
-		weekday: "long",
+		weekday: "short",
 		day: "numeric",
-		month: "long",
+		month: "short",
 		year: "numeric",
 	});
 	if (diff === 0) return "Today · " + nice;

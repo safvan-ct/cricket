@@ -11,7 +11,7 @@
 .match-day-summary::-webkit-details-marker{display:none}
 .match-day-summary::before{content:'▸';color:var(--blue);margin-right:2px}
 .match-day[open]>.match-day-summary::before{content:'▾'}
-.match-day-name{font-size:13px;letter-spacing:.3px}
+.match-day-name{font-size:13px;letter-spacing:.3px;margin-right:auto}
 .match-day-count{font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap}
 .match-day-body{display:grid;gap:8px;padding:0 12px 12px}
 /* Controls */
@@ -66,7 +66,7 @@
 .over-team-summary::-webkit-details-marker{display:none}
 .over-team-summary::before{content:'▸';color:var(--blue);margin-right:2px;transition:transform .15s}
 .over-team[open]>.over-team-summary::before{content:'▾'}
-.over-team-name{text-transform:uppercase;letter-spacing:.6px;font-size:13px}
+.over-team-name{text-transform:uppercase;letter-spacing:.6px;font-size:13px;margin-right:auto}
 .over-team-score{font:800 18px 'Barlow Condensed';color:var(--blue);white-space:nowrap}
 .over-team-body{padding:0 12px 12px}
 .over-team-body .over-card{box-shadow:none}

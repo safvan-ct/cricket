@@ -104,7 +104,7 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
           </div>
 
           <div class="team-block">
-            <label>Team B name<input id="teamB" required value="BNA"></label>
+            <label>Team B name<input id="teamB" required value="BNI"></label>
             <label>Players<input id="playersB" type="number" min="2" max="15" value="7" required></label>
           </div>
 
@@ -119,7 +119,7 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
               </label>
               <label class="toss-radio">
                 <input type="radio" name="batting" id="battingB" value="B">
-                <span class="toss-pill" id="pillB">BNA</span>
+                <span class="toss-pill" id="pillB">BNI</span>
               </label>
             </div>
             <p id="tossNote" class="hint hidden">Toss is locked after the first ball.</p>
