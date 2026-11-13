@@ -187,8 +187,16 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
           <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="4">4</label>
           <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="5">5</label>
           <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="6">6</label>
+          <label class="modal-addon-opt addon-max"><input type="radio" name="modalAddon" value="7">7</label>
         </div>
-        <label id="modalWicketRow" class="modal-check"><input id="modalWicket" type="checkbox"> Wicket</label>
+        <label id="modalWicketRow" class="modal-check">
+          <span class="modal-wicket-icon" aria-hidden="true">👆</span>
+          <span class="modal-wicket-copy">
+            <span class="modal-wicket-title">Wicket</span>
+            <span class="modal-wicket-sub">(Run out, stumping, hit wicket)</span>
+          </span>
+          <input id="modalWicket" type="checkbox">
+        </label>
       </div>
       <div class="modal-actions">
         <button id="modalOk" class="primary">OK</button>

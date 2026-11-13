@@ -1184,15 +1184,18 @@ function commitExtra(type, additional, wicket) {
 function addonValue() {
 	const el = document.querySelector('input[name="modalAddon"]:checked');
 	const n = el ? parseInt(el.value, 10) : 0;
-	return Number.isNaN(n) ? 0 : Math.min(6, Math.max(0, n));
+	const max = $("modalFields").classList.contains("penalty-mode") ? 7 : 6;
+	return Number.isNaN(n) ? 0 : Math.min(max, Math.max(0, n));
 }
 async function openDeliveryPopup(type) {
 	if (!isAdmin || !current || isComplete()) return;
 	const isWicket = type === "wicket";
 	const isOvr = type === "overthrow";
+	const isPenalty = type === "wide" || type === "no-ball";
 	$("modalWicket").checked = isWicket;
 	$("modalWicketRow").classList.toggle("hidden", isWicket);
 	$("modalFields").classList.toggle("overthrow-mode", isOvr);
+	$("modalFields").classList.toggle("penalty-mode", isPenalty);
 	const msg = isOvr
 		? "Runs completed, then 4 overthrows."
 		: "Choose add-on runs, then mark the delivery.";
