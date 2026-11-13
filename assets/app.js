@@ -1184,7 +1184,7 @@ function commitExtra(type, additional, wicket) {
 function addonValue() {
 	const el = document.querySelector('input[name="modalAddon"]:checked');
 	const n = el ? parseInt(el.value, 10) : 0;
-	const max = $("modalFields").classList.contains("penalty-mode") ? 7 : 6;
+	const max = $("modalFields").classList.contains("overthrow-mode") ? 3 : 7;
 	return Number.isNaN(n) ? 0 : Math.min(max, Math.max(0, n));
 }
 async function openDeliveryPopup(type) {
@@ -1192,6 +1192,7 @@ async function openDeliveryPopup(type) {
 	const isWicket = type === "wicket";
 	const isOvr = type === "overthrow";
 	const isPenalty = type === "wide" || type === "no-ball";
+	document.querySelector('input[name="modalAddon"][value="0"]').checked = true;
 	$("modalWicket").checked = isWicket;
 	$("modalWicketRow").classList.toggle("hidden", isWicket);
 	$("modalFields").classList.toggle("overthrow-mode", isOvr);

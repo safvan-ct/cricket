@@ -96,13 +96,13 @@
 .modal-addon-opt{flex:1;min-width:0;margin:0;cursor:pointer;display:flex;align-items:center;justify-content:center;height:44px;border-radius:10px;background:#e7f0fa;color:#002868;font-weight:800;font-size:15px}
 .modal-addon-opt input{display:none}
 .modal-addon-opt:has(input:checked){background:var(--blue);color:#fff}
-.modal-addon-opt.addon-max{display:none}
-.modal-fields.penalty-mode .modal-addon-opt:has([value="0"]){display:none}
-.modal-fields.penalty-mode .modal-addon-opt.addon-max{display:flex}
+.modal-addon-opt.addon-zero{display:none}
+.modal-addon-opt.addon-max{display:flex}
 .modal-fields.overthrow-mode .modal-addon-opt:has([value="0"]),
 .modal-fields.overthrow-mode .modal-addon-opt:has([value="4"]),
 .modal-fields.overthrow-mode .modal-addon-opt:has([value="5"]),
-.modal-fields.overthrow-mode .modal-addon-opt:has([value="6"]){display:none}
+.modal-fields.overthrow-mode .modal-addon-opt:has([value="6"]),
+.modal-fields.overthrow-mode .modal-addon-opt:has([value="7"]){display:none}
 .modal-check{flex-direction:row;align-items:center;gap:8px;font-size:12px;cursor:pointer}
 .modal-check input{width:18px;height:18px;margin:0;flex:0 0 auto;accent-color:var(--red)}
 .modal-wicket-icon,.modal-wicket-sub{display:none}

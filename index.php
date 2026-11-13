@@ -180,7 +180,7 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
       <div id="modalFields" class="modal-fields hidden">
         <p id="modalAddonLabel" class="modal-addon-label">Add-on runs</p>
         <div class="modal-addon" role="radiogroup" aria-label="Add-on runs">
-          <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="0" checked>0</label>
+          <label class="modal-addon-opt addon-zero"><input type="radio" name="modalAddon" value="0" checked>0</label>
           <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="1">1</label>
           <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="2">2</label>
           <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="3">3</label>
