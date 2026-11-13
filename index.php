@@ -2,6 +2,19 @@
 $configPath = __DIR__ . '/config/config.php';
 $config = file_exists($configPath) ? require $configPath : [];
 $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
+$appVersion = substr(hash('sha256', implode('|', [
+  hash_file('sha256', __FILE__),
+  hash_file('sha256', __DIR__ . '/sw.js'),
+  hash_file('sha256', __DIR__ . '/assets/style.css'),
+  hash_file('sha256', __DIR__ . '/assets/app.js'),
+  hash_file('sha256', __DIR__ . '/assets/qrcode.min.js'),
+  hash_file('sha256', __DIR__ . '/assets/favicon.svg'),
+  hash_file('sha256', __DIR__ . '/assets/icon-192.png'),
+  hash_file('sha256', __DIR__ . '/assets/icon-512.png'),
+  hash_file('sha256', __DIR__ . '/manifest.webmanifest'),
+  hash_file('sha256', __DIR__ . '/api/index.php'),
+])), 0, 16);
+header('Cache-Control: no-cache, no-store, must-revalidate');
 ?>
 <!doctype html>
 <html lang="en">
@@ -16,10 +29,10 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
   <meta name="theme-color" content="#002868">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Cricket">
-  <link rel="stylesheet" href="assets/style.css?v=<?php echo filemtime(__DIR__ . '/assets/style.css') ?>">
+  <link rel="stylesheet" href="assets/style.css?v=<?php echo $appVersion ?>">
 </head>
 
-<body data-qr-url="<?php echo htmlspecialchars($qrUrl, ENT_QUOTES, 'UTF-8'); ?>">
+<body data-qr-url="<?php echo htmlspecialchars($qrUrl, ENT_QUOTES, 'UTF-8'); ?>" data-app-version="<?php echo htmlspecialchars($appVersion, ENT_QUOTES, 'UTF-8'); ?>">
   <header>
     <div class="brand"><span class="ball">●</span>
       <div><b>CRICKET</b><small>LIVE SCOREBOARD</small></div>
@@ -204,8 +217,8 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
     </div>
   </div>
 
-  <script src="assets/qrcode.min.js?v=<?php echo filemtime(__DIR__ . '/assets/qrcode.min.js') ?>"></script>
-  <script src="assets/app.js?v=<?php echo filemtime(__DIR__ . '/assets/app.js') ?>"></script>
+  <script src="assets/qrcode.min.js?v=<?php echo $appVersion ?>"></script>
+  <script src="assets/app.js?v=<?php echo $appVersion ?>"></script>
 </body>
 
 </html>

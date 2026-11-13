@@ -107,7 +107,10 @@ function applyRole() {
 async function boot() {
 	if ("serviceWorker" in navigator) {
 		navigator.serviceWorker
-			.register("sw.js", { updateViaCache: "none" })
+			.register(
+				"sw.js?v=" + encodeURIComponent(document.body.dataset.appVersion),
+				{ updateViaCache: "none" },
+			)
 			.catch(() => {});
 	}
 	try {
