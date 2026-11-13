@@ -87,12 +87,12 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
         <form id="setupForm" class="form-stack">
           <div class="team-block">
             <label>Team A name<input id="teamA" required value="PAREL"></label>
-            <label>Number of players<input id="playersA" type="number" min="2" max="15" value="7" required></label>
+            <label>Players<input id="playersA" type="number" min="2" max="15" value="7" required></label>
           </div>
 
           <div class="team-block">
             <label>Team B name<input id="teamB" required value="BNA"></label>
-            <label>Number of players<input id="playersB" type="number" min="2" max="15" value="7" required></label>
+            <label>Players<input id="playersB" type="number" min="2" max="15" value="7" required></label>
           </div>
 
           <label>Overs per innings<input id="overs" type="number" min="1" max="50" value="6" required></label>
