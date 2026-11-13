@@ -1,4 +1,4 @@
-const CACHE = "scoreboard-v7";
+const CACHE = "scoreboard-v9";
 const SHELL = [
 	"./",
 	"./index.php",

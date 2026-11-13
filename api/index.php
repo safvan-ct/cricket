@@ -28,7 +28,6 @@ session_name('cricket_admin_session');
 session_set_cookie_params([
   'lifetime' => $sessionLifetime,
   'path' => '/',
-  'domain' => '',
   'secure' => $isHttps,
   'httponly' => true,
   'samesite' => 'Lax'
@@ -42,7 +41,6 @@ function refreshAdminSessionCookie(int $lifetime, bool $isHttps): void
     setcookie(session_name(), session_id(), [
       'expires' => time() + $lifetime,
       'path' => '/',
-      'domain' => '',
       'secure' => $isHttps,
       'httponly' => true,
       'samesite' => 'Lax'
@@ -78,6 +76,26 @@ try {
 } catch (Throwable $e) {
   respond(['error' => 'Database connection failed. Check config/config.php and database setup.'], 500);
 }
+function getAdminToken(array $config): string
+{
+  $secret = (string)($config['admin_password'] ?? '') . '_cricket_admin_salt_key';
+  return hash('sha256', $secret);
+}
+
+function checkAdminAuth(array $config): bool
+{
+  if (!empty($_SESSION['cricket_admin'])) {
+    return true;
+  }
+  $headerToken = $_SERVER['HTTP_X_ADMIN_TOKEN'] ?? '';
+  if ($headerToken !== '' && !empty($config['admin_password']) && hash_equals(getAdminToken($config), $headerToken)) {
+    $_SESSION['cricket_admin'] = true;
+    $_SESSION['cricket_logged_at'] = time();
+    return true;
+  }
+  return false;
+}
+
 $action = $_GET['action'] ?? '';
 if ($action === 'login') {
   $b = body();
@@ -86,29 +104,15 @@ if ($action === 'login') {
   $_SESSION['cricket_admin'] = true;
   $_SESSION['cricket_logged_at'] = time();
 
-  setcookie(session_name(), session_id(), [
-    'expires' => time() + $sessionLifetime,
-    'path' => '/',
-    'domain' => '',
-    'secure' => $isHttps,
-    'httponly' => true,
-    'samesite' => 'Lax'
-  ]);
+  refreshAdminSessionCookie($sessionLifetime, $isHttps);
 
-  respond(['ok' => true]);
+  respond(['ok' => true, 'token' => getAdminToken($config)]);
 }
 if ($action === 'status') {
   $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
-  $auth = !empty($_SESSION['cricket_admin']);
+  $auth = checkAdminAuth($config);
   if ($auth) {
-    setcookie(session_name(), session_id(), [
-      'expires' => time() + $sessionLifetime,
-      'path' => '/',
-      'domain' => '',
-      'secure' => $isHttps,
-      'httponly' => true,
-      'samesite' => 'Lax'
-    ]);
+    refreshAdminSessionCookie($sessionLifetime, $isHttps);
   }
   respond(['authenticated' => $auth, 'app_url' => $qrUrl]);
 }
@@ -122,7 +126,6 @@ if ($action === 'logout') {
       [
         'expires' => time() - 42000,
         'path' => $params['path'] ?? '/',
-        'domain' => $params['domain'] ?? '',
         'secure' => $params['secure'] ?? false,
         'httponly' => $params['httponly'] ?? true,
         'samesite' => $params['samesite'] ?? 'Lax'
@@ -134,7 +137,8 @@ if ($action === 'logout') {
 }
 function requireAdmin(): void
 {
-  if (empty($_SESSION['cricket_admin'])) respond(['error' => 'Admin sign-in required'], 401);
+  global $config;
+  if (!checkAdminAuth($config)) respond(['error' => 'Admin sign-in required'], 401);
 }
 function allMatches(PDO $pdo): array
 {
@@ -349,11 +353,10 @@ if ($action === 'update') {
   respond(['ok' => true, 'title' => $title, 'state' => $s]);
 }
 if ($action === 'delivery') {
-  requireAdmin();
   $b = body();
   $pdo->beginTransaction();
   $s = loadMatchForUpdate($pdo, $id);
-  if (($s['status'] ?? '') === 'complete') {
+  if (($s['status'] ?? '') === 'complete' || !empty($s['locked'])) {
     $pdo->rollBack();
     respond(['error' => 'Match is complete'], 422);
   }
@@ -379,7 +382,6 @@ if ($action === 'delivery') {
   respond(['ok' => true, 'state' => $s]);
 }
 if ($action === 'end_innings') {
-  requireAdmin();
   $pdo->beginTransaction();
   $s = loadMatchForUpdate($pdo, $id);
   if (($s['status'] ?? '') !== 'live' || (int)($s['innings'] ?? 1) !== 1) {
@@ -392,7 +394,6 @@ if ($action === 'end_innings') {
   respond(['ok' => true, 'state' => $s]);
 }
 if ($action === 'end_match') {
-  requireAdmin();
   $pdo->beginTransaction();
   $s = loadMatchForUpdate($pdo, $id);
   if (($s['status'] ?? '') !== 'live' || (int)($s['innings'] ?? 1) !== 2) {
@@ -418,7 +419,6 @@ if ($action === 'mark_complete') {
   respond(['ok' => true, 'state' => $s]);
 }
 if ($action === 'undo') {
-  requireAdmin();
   $pdo->beginTransaction();
   $s = loadMatchForUpdate($pdo, $id);
   if (!empty($s['locked'])) {

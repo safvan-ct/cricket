@@ -18,9 +18,14 @@ const EXTRA_LABELS = {
 };
 async function api(action, method = "GET", data = null, id = null) {
 	const url = "api/index.php?action=" + action + (id ? "&id=" + id : "");
+	const token = localStorage.getItem("cricket_admin_token") || "";
+	const headers = data ? { "Content-Type": "application/json" } : {};
+	if (token) {
+		headers["X-Admin-Token"] = token;
+	}
 	const r = await fetch(url, {
 		method,
-		headers: data ? { "Content-Type": "application/json" } : {},
+		headers,
 		body: data ? JSON.stringify(data) : undefined,
 		credentials: "same-origin",
 	});
@@ -29,6 +34,7 @@ async function api(action, method = "GET", data = null, id = null) {
 		if (r.status === 401 && action !== "login") {
 			isAdmin = false;
 			localStorage.removeItem("cricket_admin_logged");
+			localStorage.removeItem("cricket_admin_token");
 			applyRole();
 		}
 		throw new Error(j.error || "Request failed");
@@ -110,7 +116,6 @@ function applyRole() {
 	headerMode();
 	$("logout").classList.toggle("hidden", !isAdmin);
 	$("loginBtn").classList.toggle("hidden", isAdmin);
-	$("recordPanel").classList.toggle("hidden", !isAdmin);
 }
 async function boot() {
 	if ("serviceWorker" in navigator) {
@@ -129,7 +134,9 @@ async function boot() {
 			})
 			.catch(() => {});
 	}
-	const cachedAdmin = localStorage.getItem("cricket_admin_logged") === "1";
+	const cachedToken = localStorage.getItem("cricket_admin_token") || "";
+	const cachedAdmin =
+		localStorage.getItem("cricket_admin_logged") === "1" || !!cachedToken;
 	if (cachedAdmin) {
 		isAdmin = true;
 		applyRole();
@@ -141,6 +148,7 @@ async function boot() {
 			localStorage.setItem("cricket_admin_logged", "1");
 		} else {
 			localStorage.removeItem("cricket_admin_logged");
+			localStorage.removeItem("cricket_admin_token");
 		}
 		if (s && s.app_url && document.body)
 			document.body.dataset.qrUrl = s.app_url;
@@ -187,6 +195,14 @@ $("togglePassword").onclick = () => {
 	$("eyeOff").classList.toggle("hidden", !show);
 };
 $("backToMatches").onclick = () => {
+	if (current && state) {
+		show("app");
+		$("matchesView").classList.add("hidden");
+		$("setupView").classList.add("hidden");
+		$("scoreView").classList.remove("hidden");
+		render();
+		return;
+	}
 	forgetMatch();
 	show("app");
 	loadMatches();
@@ -194,14 +210,25 @@ $("backToMatches").onclick = () => {
 $("loginForm").onsubmit = async (e) => {
 	e.preventDefault();
 	try {
-		await api("login", "POST", { password: $("password").value });
+		const res = await api("login", "POST", { password: $("password").value });
 		$("password").value = "";
 		isAdmin = true;
 		localStorage.setItem("cricket_admin_logged", "1");
+		if (res && res.token) {
+			localStorage.setItem("cricket_admin_token", res.token);
+		}
 		applyRole();
-		forgetMatch();
-		show("app");
-		loadMatches();
+		if (current && state) {
+			show("app");
+			$("matchesView").classList.add("hidden");
+			$("setupView").classList.add("hidden");
+			$("scoreView").classList.remove("hidden");
+			render();
+		} else {
+			forgetMatch();
+			show("app");
+			loadMatches();
+		}
 	} catch (err) {
 		$("loginError").textContent = err.message;
 	}
@@ -213,6 +240,7 @@ $("logout").onclick = async () => {
 	} catch (e) {}
 	isAdmin = false;
 	localStorage.removeItem("cricket_admin_logged");
+	localStorage.removeItem("cricket_admin_token");
 	current = null;
 	applyRole();
 	forgetMatch();
@@ -973,29 +1001,32 @@ function render() {
 		needBlock.classList.add("hidden");
 		resultEl.classList.add("hidden");
 	}
-	const live = state.status !== "complete";
+	const complete = isComplete();
+	const live = !complete;
 	$("endInnings").classList.toggle(
 		"hidden",
-		!(isAdmin && live && state.innings === 1),
+		!(live && state.innings === 1),
 	);
 	$("endMatch").classList.toggle(
 		"hidden",
-		!(isAdmin && live && state.innings === 2),
+		!(live && state.innings === 2),
 	);
 	$("undo").classList.toggle("hidden", !!state.locked);
-	$("undo").textContent = isComplete()
+	$("undo").textContent = complete
 		? "Reopen match"
 		: state.innings === 2 && !(state.deliveries || []).length
 			? "Reopen innings"
 			: "↶ Undo";
 	$("recordPanel").classList.toggle(
 		"hidden",
-		!isAdmin || (isComplete() && !!state.locked),
+		complete && !!state.locked,
 	);
-	$("recordPanel").classList.toggle("scoring-locked", isComplete());
-	if (isComplete()) {
+	$("recordPanel").classList.toggle("scoring-locked", complete);
+	if (complete) {
 		$("actionMessage").textContent =
 			state.result && state.result.text ? state.result.text : "Match complete.";
+	} else if (!pendingHint()) {
+		$("actionMessage").textContent = defaultHint();
 	}
 	const overs = groupOvers(state.deliveries || []);
 	const lastOver = overs.length ? overs[overs.length - 1] : null;
@@ -1210,7 +1241,7 @@ async function addDelivery(
 	extraRuns = 0,
 	wicket = false,
 ) {
-	if (!isAdmin || !current || isComplete()) return;
+	if (!current || isComplete()) return;
 	try {
 		const prev = state;
 		const prevInnings = state.innings;
@@ -1295,7 +1326,7 @@ document.querySelectorAll('input[name="modalAddon"]').forEach((r) => {
 	};
 });
 async function openDeliveryPopup(type) {
-	if (!isAdmin || !current || isComplete()) return;
+	if (!current || isComplete()) return;
 	const isWicket = type === "wicket";
 	const isOvr = type === "overthrow";
 	$("modalWicket").checked = isWicket;
