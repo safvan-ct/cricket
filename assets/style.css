@@ -107,11 +107,11 @@
 .modal-check input{width:18px;height:18px;margin:0;flex:0 0 auto;accent-color:var(--red)}
 .modal-wicket-icon,.modal-wicket-sub{display:none}
 .modal-wicket-copy{flex:1}
-.modal-fields.penalty-mode .modal-check{gap:10px;margin-top:2px;padding:10px 12px;border:1px solid #f5b7b7;border-radius:12px;background:#fff1f1}
-.modal-fields.penalty-mode .modal-wicket-icon{display:block;font-size:20px;line-height:1}
-.modal-fields.penalty-mode .modal-wicket-copy{display:flex;flex-direction:column;gap:1px}
-.modal-fields.penalty-mode .modal-wicket-title{font-size:14px;font-weight:800;color:#c43d3d;line-height:1.2}
-.modal-fields.penalty-mode .modal-wicket-sub{display:block;font-size:11px;font-weight:600;color:#e06a6a;line-height:1.3}
+.modal-fields .modal-check{gap:10px;margin-top:2px;padding:10px 12px;border:1px solid #f5b7b7;border-radius:12px;background:#fff1f1}
+.modal-fields .modal-wicket-icon{display:block;font-size:20px;line-height:1}
+.modal-fields .modal-wicket-copy{display:flex;flex-direction:column;gap:1px}
+.modal-fields .modal-wicket-title{font-size:14px;font-weight:800;color:#c43d3d;line-height:1.2}
+.modal-fields .modal-wicket-sub{display:block;font-size:11px;font-weight:600;color:#e06a6a;line-height:1.3}
 .header-actions{display:flex;align-items:center;gap:8px}
 .header-actions button{margin-bottom:0}
 .qr-btn{display:grid;place-items:center;padding:9px 12px;min-width:40px;height:38px}

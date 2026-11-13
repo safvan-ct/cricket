@@ -157,7 +157,7 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
             <button id="undo" class="ghost">↶ Undo</button>
             <button id="endInnings" class="ghost">End innings</button>
             <button id="endMatch" class="ghost hidden">End match</button>
-            <button data-extra="overthrow" class="ghost">Ovr 4</button>
+            <button data-extra="overthrow" class="ghost">OT 4</button>
           </div>
           <p id="actionMessage" class="hint">Tap a run, or an extra / wicket to add on runs.</p>
         </div>

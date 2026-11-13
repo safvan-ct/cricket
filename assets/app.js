@@ -12,7 +12,7 @@ const EXTRA_LABELS = {
 	wide: "Wide",
 	"no-ball": "No-ball",
 	bye: "Bye",
-	overthrow: "Ovr 4",
+	overthrow: "Overthrow 4",
 	wicket: "Wicket",
 };
 async function api(action, method = "GET", data = null, id = null) {
