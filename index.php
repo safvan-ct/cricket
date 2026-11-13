@@ -99,12 +99,12 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
 
         <form id="setupForm" class="form-stack">
           <div class="team-block">
-            <label>Team A name<input id="teamA" required value="PAREL"></label>
+            <label>Team A<input id="teamA" required value="PAREL"></label>
             <label>Players<input id="playersA" type="number" min="2" max="15" value="7" required></label>
           </div>
 
           <div class="team-block">
-            <label>Team B name<input id="teamB" required value="BNI"></label>
+            <label>Team B<input id="teamB" required value="BNI"></label>
             <label>Players<input id="playersB" type="number" min="2" max="15" value="7" required></label>
           </div>
 
