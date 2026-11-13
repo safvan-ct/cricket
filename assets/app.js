@@ -20,6 +20,7 @@ async function api(action, method = "GET", data = null, id = null) {
 	const url = "api/index.php?action=" + action + (id ? "&id=" + id : "");
 	const r = await fetch(url, {
 		method,
+		cache: "no-store",
 		headers: data ? { "Content-Type": "application/json" } : {},
 		body: data ? JSON.stringify(data) : undefined,
 	});
@@ -926,10 +927,7 @@ function render() {
 		!isAdmin || (isComplete() && !!state.locked),
 	);
 	$("recordPanel").classList.toggle("scoring-locked", isComplete());
-	if (isComplete()) {
-		$("actionMessage").textContent =
-			state.result && state.result.text ? state.result.text : "Match complete.";
-	}
+	$("actionMessage").classList.toggle("hidden", isComplete());
 	const overs = groupOvers(state.deliveries || []);
 	const lastOver = overs.length ? overs[overs.length - 1] : null;
 	const stickyOver = lastOver && !lastOver.complete ? lastOver.balls : [];
