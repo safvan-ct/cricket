@@ -364,7 +364,7 @@ if ($action === 'delivery') {
     $item[$k] = $d[$k] ?? null;
   }
   $item['extra_type'] = $item['extra_type'] ?? '';
-  $item['runs'] = max(0, min(6, (int)$item['runs']));
+  $item['runs'] = max(0, min(10, (int)$item['runs']));
   $item['extra_runs'] = max(0, min(10, (int)$item['extra_runs']));
   $item['wicket'] = !empty($item['wicket']);
   $item['created'] = date('c');

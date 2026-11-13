@@ -29,7 +29,7 @@ $swVersion = file_exists($swPath) ? (string)filemtime($swPath) : (string)time();
     <div class="header-actions">
       <button id="qrBtn" class="ghost qr-btn" aria-label="Show QR code" title="Scan QR code">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
-          <path d="M2 2h8v8H2V2zm2 2v4h4V4H4zm10-2h8v8h-8V2zm2 2v4h4V4h-4zM2 14h8v8H2v-8zm2 2v4h4v-4H4zm10 0h2v2h-2v-2zm4 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm4 0h2v2h-2v-2zm-2-2h2v2h-2v-2zm4-2h2v2h-2v-2zm0 4h2v2h-2v-2zM5 5h2v2H5V5zm12 0h2v2h-2V5zM5 17h2v2H5v-2z"/>
+          <path d="M2 2h8v8H2V2zm2 2v4h4V4H4zm10-2h8v8h-8V2zm2 2v4h4V4h-4zM2 14h8v8H2v-8zm2 2v4h4v-4H4zm10 0h2v2h-2v-2zm4 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm4 0h2v2h-2v-2zm-2-2h2v2h-2v-2zm4-2h2v2h-2v-2zm0 4h2v2h-2v-2zM5 5h2v2H5V5zm12 0h2v2h-2V5zM5 17h2v2H5v-2z" />
         </svg>
       </button>
       <button id="loginBtn" class="ghost">Sign in</button>
@@ -159,7 +159,7 @@ $swVersion = file_exists($swPath) ? (string)filemtime($swPath) : (string)time();
             <button id="undo" class="ghost">↶ Undo</button>
             <button id="endInnings" class="ghost">End innings</button>
             <button id="endMatch" class="ghost hidden">End match</button>
-            <button data-extra="overthrow" class="ghost">Ovr 4</button>
+            <button data-extra="overthrow" class="ghost">OT 4</button>
           </div>
           <p id="actionMessage" class="hint">Tap a run, or an extra / wicket to add on runs.</p>
         </div>
@@ -182,18 +182,28 @@ $swVersion = file_exists($swPath) ? (string)filemtime($swPath) : (string)time();
       <div id="modalFields" class="modal-fields hidden">
         <p id="modalAddonLabel" class="modal-addon-label">Add-on runs</p>
         <div class="modal-addon" role="radiogroup" aria-label="Add-on runs">
-          <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="0" checked>0</label>
-          <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="1">1</label>
-          <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="2">2</label>
-          <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="3">3</label>
-          <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="4">4</label>
-          <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="5">5</label>
-          <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="6">6</label>
+          <label class="modal-addon-opt" data-addon="1"><input type="radio" name="modalAddon" value="1">1</label>
+          <label class="modal-addon-opt" data-addon="2"><input type="radio" name="modalAddon" value="2">2</label>
+          <label class="modal-addon-opt" data-addon="3"><input type="radio" name="modalAddon" value="3">3</label>
+          <label class="modal-addon-opt" data-addon="4"><input type="radio" name="modalAddon" value="4">4</label>
+          <label class="modal-addon-opt" data-addon="5"><input type="radio" name="modalAddon" value="5">5</label>
+          <label class="modal-addon-opt" data-addon="6"><input type="radio" name="modalAddon" value="6">6</label>
+          <label class="modal-addon-opt" data-addon="7"><input type="radio" name="modalAddon" value="7">7</label>
         </div>
-        <label id="modalWicketRow" class="modal-check"><input id="modalWicket" type="checkbox"> Wicket</label>
+        <label id="modalWicketRow" class="modal-wicket-card">
+          <div class="wicket-card-left">
+            <span class="wicket-card-icon" aria-hidden="true">☝️</span>
+            <div class="wicket-card-info">
+              <span class="wicket-card-title">Wicket</span>
+              <span class="wicket-card-sub">(Run out, stumping, hit wicket)</span>
+            </div>
+          </div>
+          <input id="modalWicket" type="checkbox" class="wicket-card-checkbox">
+        </label>
       </div>
       <div class="modal-actions">
-        <button id="modalOk" class="primary">OK</button>
+        <button type="button" id="modalCancel" class="ghost hidden">Cancel</button>
+        <button type="button" id="modalOk" class="primary">OK</button>
       </div>
     </div>
   </div>

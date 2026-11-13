@@ -8,11 +8,12 @@ let pollTimer = null;
 let editingMatch = false;
 const overSectionOpen = {};
 let lastOverInnings = null;
+let lastOverStatus = null;
 const EXTRA_LABELS = {
 	wide: "Wide",
 	"no-ball": "No-ball",
 	bye: "Bye",
-	overthrow: "Ovr 4",
+	overthrow: "Overthrows 4",
 	wicket: "Wicket",
 };
 async function api(action, method = "GET", data = null, id = null) {
@@ -113,7 +114,11 @@ function applyRole() {
 }
 async function boot() {
 	if ("serviceWorker" in navigator) {
-		const swVer = (document.body && document.body.dataset && document.body.dataset.swVersion) || "";
+		const swVer =
+			(document.body &&
+				document.body.dataset &&
+				document.body.dataset.swVersion) ||
+			"";
 		const swUrl = swVer ? `sw.js?v=${encodeURIComponent(swVer)}` : "sw.js";
 		navigator.serviceWorker
 			.register(swUrl, { updateViaCache: "none" })
@@ -137,7 +142,8 @@ async function boot() {
 		} else {
 			localStorage.removeItem("cricket_admin_logged");
 		}
-		if (s && s.app_url && document.body) document.body.dataset.qrUrl = s.app_url;
+		if (s && s.app_url && document.body)
+			document.body.dataset.qrUrl = s.app_url;
 	} catch (e) {
 		isAdmin = cachedAdmin;
 	}
@@ -288,6 +294,9 @@ $("back").onclick = () => {
 	current = null;
 	editingMatch = false;
 	setPendingExtra("");
+	Object.keys(overSectionOpen).forEach((k) => delete overSectionOpen[k]);
+	lastOverInnings = null;
+	lastOverStatus = null;
 	forgetMatch();
 	show("app");
 	headerMode();
@@ -394,14 +403,20 @@ function makeMatchCard(m) {
 	const s = m.state;
 	const name = document.createElement("strong");
 	name.textContent =
-		(s.team_a || "") + " vs " + (s.team_b || "") + " (" + (s.overs_limit || 0) + ")";
+		(s.team_a || "") +
+		" vs " +
+		(s.team_b || "") +
+		" (" +
+		(s.overs_limit || 0) +
+		")";
 	const sub = document.createElement("small");
 	const past = s.innings_1 && (s.innings_1.deliveries || []).length;
 	const started = (s.deliveries || []).length || past;
 	if (started) {
 		const st = cardScore(s);
 		const score = document.createElement("b");
-		score.textContent = st.total + "/" + st.w + " (" + oversText(st.legal) + ")";
+		score.textContent =
+			st.total + "/" + st.w + " (" + oversText(st.legal) + ")";
 		const tag = document.createElement("span");
 		const done = (s.status || "") === "complete";
 		tag.className = "match-tag" + (done ? "" : " live");
@@ -485,7 +500,19 @@ async function loadMatches() {
 		keys.forEach((key, i) => {
 			const details = document.createElement("details");
 			details.className = "match-day";
+			details.name = "match-day";
 			if (i === 0) details.open = true;
+			details.addEventListener("toggle", () => {
+				if (details.open) {
+					$("matchList")
+						.querySelectorAll("details.match-day")
+						.forEach((other) => {
+							if (other !== details && other.open) {
+								other.open = false;
+							}
+						});
+				}
+			});
 			const summary = document.createElement("summary");
 			summary.className = "match-day-summary";
 			const name = document.createElement("span");
@@ -524,6 +551,7 @@ async function openMatch(id) {
 	setPendingExtra("");
 	Object.keys(overSectionOpen).forEach((k) => delete overSectionOpen[k]);
 	lastOverInnings = state ? state.innings : null;
+	lastOverStatus = isComplete() ? "complete" : (state ? state.status : null);
 	$("matchTitle").textContent = matchTitleText(state);
 	show("app");
 	$("matchesView").classList.add("hidden");
@@ -582,7 +610,10 @@ function matchTitleText(s) {
 	);
 }
 function isComplete() {
-	return state.status === "complete";
+	return (
+		!!state &&
+		(state.status === "complete" || (state.result && !!state.result.text))
+	);
 }
 function isLegalBall(d) {
 	return !["wide", "no-ball"].includes(d.extra_type || "");
@@ -765,9 +796,20 @@ function appendOverSection(
 ) {
 	const details = document.createElement("details");
 	details.className = "over-team";
+	details.name = "innings-accordion";
 	details.open = sectionIsOpen(key, defaultOpen);
 	details.addEventListener("toggle", () => {
 		overSectionOpen[key] = details.open;
+		if (details.open) {
+			el.querySelectorAll("details.over-team").forEach((other) => {
+				if (other !== details && other.open) {
+					other.open = false;
+				}
+			});
+			Object.keys(overSectionOpen).forEach((k) => {
+				if (k !== key) overSectionOpen[k] = false;
+			});
+		}
 	});
 	const summary = document.createElement("summary");
 	summary.className = "over-team-summary";
@@ -820,22 +862,36 @@ function renderOverCards() {
 		el.innerHTML = "";
 		return;
 	}
-	if (lastOverInnings !== state.innings) {
+	const complete = isComplete();
+	const statusKey = complete ? "complete" : (state ? state.status : null);
+	if (
+		lastOverInnings !== state.innings ||
+		lastOverStatus !== statusKey
+	) {
 		Object.keys(overSectionOpen).forEach((k) => delete overSectionOpen[k]);
 		lastOverInnings = state.innings;
+		lastOverStatus = statusKey;
+	}
+	const openKeys = Object.keys(overSectionOpen).filter((k) => overSectionOpen[k]);
+	if (openKeys.length > 1) {
+		const keep = openKeys[openKeys.length - 1];
+		openKeys.forEach((k) => {
+			if (k !== keep) overSectionOpen[k] = false;
+		});
 	}
 	const c = calc();
 	const batting = battingTeamName();
 	const currentScore = c.total + "/" + c.w + " (" + oversText(c.legal) + ")";
 	const liveKey = state.innings === 2 ? "innings-2" : "innings-1";
+	const defaultOpen = complete ? false : true;
 	appendOverSection(
 		el,
 		liveKey,
 		batting,
 		currentScore,
 		current,
-		!isComplete(),
-		true,
+		!complete,
+		defaultOpen,
 	);
 	if (state.innings === 2 && state.innings_1) {
 		const i1 = state.innings_1;
@@ -1013,6 +1069,7 @@ function showModal({
 	message,
 	confirmLabel = "OK",
 	showCancel = false,
+	cancelLabel = "Cancel",
 	fields = false,
 	balls = null,
 	overNumber = 0,
@@ -1021,6 +1078,11 @@ function showModal({
 	$("modalTitle").textContent = title;
 	$("modalMessage").textContent = message;
 	$("modalOk").textContent = confirmLabel;
+	const cancelBtn = $("modalCancel");
+	if (cancelBtn) {
+		cancelBtn.classList.toggle("hidden", !showCancel);
+		cancelBtn.textContent = cancelLabel || "Cancel";
+	}
 	$("modalClose").classList.toggle("hidden", !showCancel && !qr);
 	$("modalFields").classList.toggle("hidden", !fields);
 	const qrEl = $("modalQr");
@@ -1067,11 +1129,13 @@ function showModal({
 	}
 	if (fields) {
 		const ovr = $("modalFields").classList.contains("overthrow-mode");
-		const val = ovr ? "1" : "0";
-		const r = document.querySelector(
-			'input[name="modalAddon"][value="' + val + '"]',
-		);
-		if (r) r.checked = true;
+		document.querySelectorAll('input[name="modalAddon"]').forEach((r) => {
+			const isDefault = ovr && r.value === "1";
+			r.checked = isDefault;
+			r._wasChecked = isDefault;
+			const parentOpt = r.closest(".modal-addon-opt");
+			if (parentOpt) parentOpt.classList.toggle("is-checked", isDefault);
+		});
 		$("modalAddonLabel").textContent = ovr ? "Runs completed" : "Add-on runs";
 	}
 	$("modal").dataset.allowDismiss = showCancel || qr ? "1" : "0";
@@ -1184,8 +1248,7 @@ async function addDelivery(
 			await notifyPhaseChange(
 				endedOverNum ? { balls: overBalls, overNumber: endedOverNum } : null,
 			);
-		}
-		else if (closed)
+		} else if (closed)
 			await notifyOverComplete(closed, endedOverBalls(closed, r.state));
 		else $("actionMessage").textContent = "Delivery recorded.";
 	} catch (e) {
@@ -1213,8 +1276,24 @@ function commitExtra(type, additional, wicket) {
 function addonValue() {
 	const el = document.querySelector('input[name="modalAddon"]:checked');
 	const n = el ? parseInt(el.value, 10) : 0;
-	return Number.isNaN(n) ? 0 : Math.min(6, Math.max(0, n));
+	return Number.isNaN(n) ? 0 : Math.min(10, Math.max(0, n));
 }
+document.querySelectorAll('input[name="modalAddon"]').forEach((r) => {
+	r.onclick = () => {
+		if (r._wasChecked) {
+			r.checked = false;
+			r._wasChecked = false;
+			r.closest(".modal-addon-opt")?.classList.remove("is-checked");
+		} else {
+			document.querySelectorAll('input[name="modalAddon"]').forEach((other) => {
+				other._wasChecked = false;
+				other.closest(".modal-addon-opt")?.classList.remove("is-checked");
+			});
+			r._wasChecked = true;
+			r.closest(".modal-addon-opt")?.classList.add("is-checked");
+		}
+	};
+});
 async function openDeliveryPopup(type) {
 	if (!isAdmin || !current || isComplete()) return;
 	const isWicket = type === "wicket";
@@ -1260,8 +1339,7 @@ $("undo").onclick = async () => {
 		title = "Reopen innings";
 		msg = "Reopen the innings?";
 		confirmLabel = "Reopen innings";
-	}
-	else if (!(state.deliveries || []).length) return;
+	} else if (!(state.deliveries || []).length) return;
 	const ok = await showModal({
 		title,
 		message: msg,
@@ -1318,6 +1396,7 @@ $("endMatch").onclick = async () => {
 	}
 };
 $("modalOk").onclick = () => closeModal(true);
+if ($("modalCancel")) $("modalCancel").onclick = () => closeModal(false);
 $("modalClose").onclick = () => closeModal(false);
 $("modal").onclick = (e) => {
 	if (e.target === $("modal") && $("modal").dataset.allowDismiss === "1")
