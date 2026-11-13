@@ -1,6 +1,19 @@
 <?php
 
 declare(strict_types=1);
+const ADMIN_SESSION_LIFETIME = 2592000;
+ini_set('session.gc_maxlifetime', (string) ADMIN_SESSION_LIFETIME);
+$cookieParams = session_get_cookie_params();
+$isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+  || (int)($_SERVER['SERVER_PORT'] ?? 0) === 443;
+session_set_cookie_params([
+  'lifetime' => ADMIN_SESSION_LIFETIME,
+  'path' => $cookieParams['path'],
+  'domain' => $cookieParams['domain'],
+  'secure' => $isHttps || $cookieParams['secure'],
+  'httponly' => true,
+  'samesite' => 'Lax',
+]);
 session_start();
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
