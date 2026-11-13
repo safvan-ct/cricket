@@ -8,6 +8,7 @@ let pollTimer = null;
 let editingMatch = false;
 const overSectionOpen = {};
 let lastOverInnings = null;
+let lastOverComplete = null;
 const EXTRA_LABELS = {
 	wide: "Wide",
 	"no-ball": "No-ball",
@@ -495,6 +496,7 @@ async function openMatch(id) {
 	setPendingExtra("");
 	Object.keys(overSectionOpen).forEach((k) => delete overSectionOpen[k]);
 	lastOverInnings = state ? state.innings : null;
+	lastOverComplete = state ? isComplete() : null;
 	$("matchTitle").textContent = matchTitleText(state);
 	show("app");
 	$("matchesView").classList.add("hidden");
@@ -738,8 +740,16 @@ function appendOverSection(
 	details.className = "over-team";
 	details.open = sectionIsOpen(key, defaultOpen);
 	details.addEventListener("toggle", () => {
+		if (details.open) {
+			el.querySelectorAll(".over-team[open]").forEach((other) => {
+				if (other === details) return;
+				other.open = false;
+				overSectionOpen[other.dataset.sectionKey] = false;
+			});
+		}
 		overSectionOpen[key] = details.open;
 	});
+	details.dataset.sectionKey = key;
 	const summary = document.createElement("summary");
 	summary.className = "over-team-summary";
 	const name = document.createElement("span");
@@ -791,9 +801,14 @@ function renderOverCards() {
 		el.innerHTML = "";
 		return;
 	}
-	if (lastOverInnings !== state.innings) {
+	const complete = isComplete();
+	if (
+		lastOverInnings !== state.innings ||
+		lastOverComplete !== complete
+	) {
 		Object.keys(overSectionOpen).forEach((k) => delete overSectionOpen[k]);
 		lastOverInnings = state.innings;
+		lastOverComplete = complete;
 	}
 	const c = calc();
 	const batting = battingTeamName();
@@ -806,7 +821,7 @@ function renderOverCards() {
 		currentScore,
 		current,
 		!isComplete(),
-		true,
+		!complete,
 	);
 	if (state.innings === 2 && state.innings_1) {
 		const i1 = state.innings_1;
