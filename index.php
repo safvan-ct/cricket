@@ -2,11 +2,15 @@
 $configPath = __DIR__ . '/config/config.php';
 $config = file_exists($configPath) ? require $configPath : [];
 $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
+$appBasePath = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
+$appBasePath = $appBasePath === '/' || $appBasePath === '.' ? '' : rtrim($appBasePath, '/');
 $appVersion = substr(hash('sha256', implode('|', [
   hash_file('sha256', __FILE__),
   hash_file('sha256', __DIR__ . '/sw.js'),
   hash_file('sha256', __DIR__ . '/assets/style.css'),
-  hash_file('sha256', __DIR__ . '/assets/app.js'),
+  hash_file('sha256', __DIR__ . '/assets/js/routes.js'),
+  hash_file('sha256', __DIR__ . '/assets/js/router.js'),
+  hash_file('sha256', __DIR__ . '/assets/js/app.js'),
   hash_file('sha256', __DIR__ . '/assets/qrcode.min.js'),
   hash_file('sha256', __DIR__ . '/assets/favicon.svg'),
   hash_file('sha256', __DIR__ . '/assets/icon-192.png'),
@@ -23,6 +27,7 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <base href="<?php echo htmlspecialchars(($appBasePath ?: '') . '/', ENT_QUOTES, 'UTF-8'); ?>">
   <title>Scoreboard</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
@@ -33,7 +38,7 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
   <link rel="stylesheet" href="assets/style.css?v=<?php echo $appVersion ?>">
 </head>
 
-<body data-qr-url="<?php echo htmlspecialchars($qrUrl, ENT_QUOTES, 'UTF-8'); ?>" data-app-version="<?php echo htmlspecialchars($appVersion, ENT_QUOTES, 'UTF-8'); ?>">
+<body data-base-path="<?php echo htmlspecialchars($appBasePath, ENT_QUOTES, 'UTF-8'); ?>" data-qr-url="<?php echo htmlspecialchars($qrUrl, ENT_QUOTES, 'UTF-8'); ?>" data-app-version="<?php echo htmlspecialchars($appVersion, ENT_QUOTES, 'UTF-8'); ?>">
   <header>
     <div class="brand"><span class="ball">●</span>
       <div><b>CRICKET</b><small>LIVE SCOREBOARD</small></div>
@@ -374,7 +379,9 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
   </div>
 
   <script src="assets/qrcode.min.js?v=<?php echo $appVersion ?>"></script>
-  <script src="assets/app.js?v=<?php echo $appVersion ?>"></script>
+  <script src="assets/js/routes.js?v=<?php echo $appVersion ?>"></script>
+  <script src="assets/js/router.js?v=<?php echo $appVersion ?>"></script>
+  <script src="assets/js/app.js?v=<?php echo $appVersion ?>"></script>
 </body>
 
 </html>

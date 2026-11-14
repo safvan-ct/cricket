@@ -10,9 +10,10 @@ This version is designed for Hostinger Premium Web Hosting. It uses PHP (PDO) an
 
 ## 2. Configure the app
 1. Upload the contents of this project into the website's `public_html` directory (or a subdirectory such as `public_html/score`).
-2. In `config/`, copy `config.example.php` to `config.php`.
-3. Edit `config.php`: enter the database name, database username, database password, and replace the admin password with a long unique password.
-4. Do not upload `config.php` to a public repository. The `config/.htaccess` file blocks direct web access on Apache.
+2. Ensure PHP 8.0+ with PDO MySQL enabled.
+3. In `config/`, copy `config.example.php` to `config.php`.
+4. Edit `config.php`: enter the database name, database username, database password, and replace the admin password with a long unique password.
+5. Do not upload `config.php` to a public repository. The `config/.htaccess` file blocks direct web access on Apache.
 
 ## 3. Create the table
 1. In hPanel open **phpMyAdmin** for the database.
@@ -21,6 +22,10 @@ This version is designed for Hostinger Premium Web Hosting. It uses PHP (PDO) an
 
 ## 4. Open the app
 Visit `https://your-domain.com/` (or the subdirectory where you uploaded it). Sign in with the admin password configured in `config.php`.
+
+The app uses direct routes for `/matches`, `/matches/new`, `/matches/{id}`, `/matches/{id}/edit`, and `/login`. Apache's included `.htaccess` rewrites these routes to the app shell; older `#m={id}` match links are still supported. Frontend route definitions, navigation, and application code are organized under `assets/js/`.
+
+The API is available under `/api/`: auth uses `/status`, `/login`, and `/logout`; matches use `/matches` and `/matches/{id}`; players use `/players` and `/players/{id}`; scoring actions use `/matches/{id}/{action}`. Legacy `api/index.php?action=...` requests remain supported. Every API response uses `{ "success": true, "data": ... }` or `{ "success": false, "error": { "code": "...", "message": "..." } }`.
 
 ## Included
 - Create matches with team names, player count, overs and batting-first selection.

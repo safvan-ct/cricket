@@ -33,7 +33,9 @@ function formatPlayerName(name) {
 		.replace(/(^|[\s\-\.\/'])([a-z])/g, (_, p1, p2) => p1 + p2.toUpperCase());
 }
 async function api(action, method = "GET", data = null, id = null) {
-	const url = "api/index.php?action=" + action + (id ? "&id=" + id : "");
+	const url = new URL("api/index.php", document.baseURI);
+	url.searchParams.set("action", action);
+	if (id) url.searchParams.set("id", id);
 	const r = await fetch(url, {
 		method,
 		cache: "no-store",
@@ -42,8 +44,22 @@ async function api(action, method = "GET", data = null, id = null) {
 		credentials: "same-origin",
 	});
 	const j = await r.json();
-	if (!r.ok) throw new Error(j.error || "Request failed");
-	return j;
+	if (!r.ok || j.success === false) {
+		const message =
+			typeof j.error === "string"
+				? j.error
+				: j.error && j.error.message
+					? j.error.message
+					: "Request failed";
+		const error = new Error(message);
+		if (j.error && typeof j.error === "object" && j.error.code) {
+			error.code = j.error.code;
+		}
+		throw error;
+	}
+	return j.success === true && Object.prototype.hasOwnProperty.call(j, "data")
+		? j.data
+		: j;
 }
 function show(id) {
 	["login", "app", "setupView", "scoreView"].forEach((x) =>
@@ -91,29 +107,37 @@ function setHomeTab(tabId) {
 		setHomeTab(tabs[nextIndex].id);
 	});
 });
-function readScoreId() {
-	const m = String(location.hash || "").match(/^#m=(\d+)/);
-	return m ? m[1] : null;
-}
 function setRoute(screen, matchId = null, mode = "push") {
-	const url = new URL(location.href);
-	url.hash = matchId ? "m=" + matchId : "";
-	const routeState = {
-		...(history.state || {}),
-		cricketScreen: screen,
-		matchId: matchId || null,
-	};
-	history[mode === "replace" ? "replaceState" : "pushState"](
-		routeState,
-		"",
-		url,
-	);
+	window.CricketRouter.navigate(screen, matchId, mode);
 }
 function rememberMatch(id, mode = "push") {
 	setRoute("score", id, mode);
 }
 function forgetMatch() {
 	setRoute("matches", null, "replace");
+}
+function pushNavState(stateUpdate = {}, hash = "", replace = false) {
+	const url = new URL(location.href);
+	url.hash = hash ? hash.replace(/^#/, "") : "";
+	const nextState = { ...(history.state || {}), ...stateUpdate };
+	if (replace) history.replaceState(nextState, "", url);
+	else history.pushState(nextState, "", url);
+}
+function goBackToMatches() {
+	stopPoll();
+	current = null;
+	state = null;
+	matchSeriesScore = null;
+	editingMatch = false;
+	setPendingExtra("");
+	forgetMatch();
+	mainTab = "matches";
+	show("app");
+	headerMode();
+	loadMatches();
+}
+function exitToMatches() {
+	goBackToMatches();
 }
 function stopPoll() {
 	if (pollTimer) {
@@ -206,16 +230,51 @@ async function boot() {
 	}
 	applyRole();
 	await loadCommonPlayers();
-	const hash = String(location.hash || "");
-	const id = readScoreId();
-	if (id) {
-		try {
-			await openMatch(id, "replace");
+	const route = window.CricketRouter.resolve();
+	switch (route.name) {
+		case "login":
+			setRoute("login", null, "replace");
+			show("login");
 			return;
-		}
-	} else {
-		history.replaceState({ page: "matches" }, "", location.pathname + location.search);
+		case "setup-create":
+			if (!isAdmin) {
+				setRoute("login", null, "replace");
+				show("login");
+				return;
+			}
+			setRoute("setup-create", null, "replace");
+			show("app");
+			fillSetup("create");
+			return;
+		case "setup-edit":
+			if (!isAdmin) {
+				setRoute("login", null, "replace");
+				show("login");
+				return;
+			}
+			if (route.matchId) {
+				try {
+					await openMatch(route.matchId, null);
+					setRoute("setup-edit", route.matchId, "replace");
+					fillSetup("update");
+					return;
+				} catch (error) {
+					showError(error.message);
+				}
+			}
+			break;
+		case "score":
+			if (route.matchId) {
+				try {
+					await openMatch(route.matchId, "replace");
+					return;
+				} catch (error) {
+					showError(error.message);
+				}
+			}
+			break;
 	}
+	mainTab = "matches";
 	setRoute("matches", null, "replace");
 	show("app");
 	loadMatches();
@@ -605,6 +664,62 @@ async function handleAddChipInput(side) {
 	}
 
 	renderRosterChips();
+}
+
+async function showAddPlayerModal(initialName = "") {
+	let input;
+	const warning = document.createElement("p");
+	warning.className = "hint hidden";
+	warning.setAttribute("role", "alert");
+	const customContent = (container) => {
+		const row = document.createElement("div");
+		row.className = "modal-custom-row";
+		const label = document.createElement("label");
+		label.textContent = "Player name *";
+		input = document.createElement("input");
+		input.type = "text";
+		input.required = true;
+		input.maxLength = 100;
+		input.autocomplete = "off";
+		input.value = initialName;
+		row.append(label, input);
+		container.append(warning, row);
+	};
+	const ok = await showModal({
+		title: "Add player",
+		message: "Register a player in the directory.",
+		confirmLabel: "Add player",
+		showCancel: true,
+		customContent,
+		validate: () => {
+			const name = formatPlayerName(input.value);
+			if (!name) {
+				warning.textContent = "Enter a player name.";
+				warning.classList.remove("hidden");
+				return false;
+			}
+			if (commonPlayers.some((player) => player.toLowerCase() === name.toLowerCase())) {
+				warning.textContent = "That player is already in the directory.";
+				warning.classList.remove("hidden");
+				return false;
+			}
+			return true;
+		},
+	});
+	if (!ok) return null;
+	const name = formatPlayerName(input.value);
+	try {
+		const result = await api("player_create", "POST", { name });
+		const savedName = formatPlayerName(
+			(result.player && result.player.name) || name,
+		);
+		commonPlayers.push(savedName);
+		commonPlayers.sort((a, b) => a.localeCompare(b));
+		return savedName;
+	} catch (error) {
+		await showError(error.message);
+		return null;
+	}
 }
 
 function autoFillRoster(side) {
@@ -1432,12 +1547,102 @@ function fillPlayers() {
 		}
 	});
 }
-function battingSide() {
-	const first = state.batting_first === "B" ? "B" : "A";
-	return state.innings === 2 ? (first === "A" ? "B" : "A") : first;
+function battingSide(matchState = state) {
+	if (!matchState) return "A";
+	const first = matchState.batting_first === "B" ? "B" : "A";
+	return Number(matchState.innings) === 2 ? (first === "A" ? "B" : "A") : first;
 }
 function battingTeamName() {
 	return battingSide() === "B" ? state.team_b : state.team_a;
+}
+function bowlingSide(matchState = state) {
+	return battingSide(matchState) === "B" ? "A" : "B";
+}
+function bowlingTeamName() {
+	return bowlingSide() === "B" ? state.team_b : state.team_a;
+}
+function teamRoster(side, matchState = state) {
+	if (!matchState) return [];
+	const normalizedSide = side === "B" ? "B" : "A";
+	const count = Math.max(
+		1,
+		Number(
+			normalizedSide === "B"
+				? matchState.players_b || matchState.players || 7
+				: matchState.players_a || matchState.players || 7,
+		),
+	);
+	const roster = Array.isArray(matchState[`roster_${normalizedSide.toLowerCase()}`])
+		? matchState[`roster_${normalizedSide.toLowerCase()}`]
+		: [];
+	return Array.from({ length: count }, (_, index) =>
+		formatPlayerName(roster[index] || `Player ${index + 1}`),
+	);
+}
+function battingRoster(matchState = state) {
+	return teamRoster(battingSide(matchState), matchState);
+}
+function bowlingRoster(matchState = state) {
+	return teamRoster(bowlingSide(matchState), matchState);
+}
+function maxWicketsForSide(side, matchState = state) {
+	return teamRoster(side, matchState).length;
+}
+function maxWickets(matchState = state) {
+	return maxWicketsForSide(battingSide(matchState), matchState);
+}
+function dismissedPlayers(deliveries = state && state.deliveries) {
+	return new Set(
+		(deliveries || [])
+			.filter((delivery) => delivery && delivery.wicket)
+			.map((delivery) =>
+				formatPlayerName(
+					String(
+						delivery.dismissed_player ||
+							delivery.batter ||
+							delivery.striker ||
+							"",
+					),
+				),
+			)
+			.filter(Boolean),
+	);
+}
+function hasValidInningsOpeners(matchState = state) {
+	if (!matchState || !matchState.openers) return false;
+	if (Number(matchState.openers_innings) !== Number(matchState.innings)) return false;
+	const roster = new Set(battingRoster(matchState));
+	const out = dismissedPlayers(matchState.deliveries);
+	const striker = formatPlayerName(matchState.openers.striker || "");
+	const nonStriker = formatPlayerName(matchState.openers.non_striker || "");
+	return (
+		!!striker &&
+		!!nonStriker &&
+		striker !== nonStriker &&
+		roster.has(striker) &&
+		roster.has(nonStriker) &&
+		!out.has(striker) &&
+		!out.has(nonStriker)
+	);
+}
+function isCreaseValidForCurrentInnings(matchState = state) {
+	if (!matchState || !matchState.crease || isComplete()) return false;
+	const crease = matchState.crease;
+	const batting = new Set(battingRoster(matchState));
+	const bowling = new Set(bowlingRoster(matchState));
+	const out = dismissedPlayers(matchState.deliveries);
+	const striker = formatPlayerName(crease.striker || "");
+	const nonStriker = formatPlayerName(crease.non_striker || "");
+	const bowler = formatPlayerName(crease.bowler || "");
+	if (!striker || !bowler || !batting.has(striker) || !bowling.has(bowler)) return false;
+	if (out.has(striker) || (nonStriker && out.has(nonStriker))) return false;
+	if (nonStriker && (nonStriker === striker || !batting.has(nonStriker))) return false;
+	return !!nonStriker || battingRoster(matchState).filter((player) => !out.has(player)).length <= 1;
+}
+async function ensureCreaseInitialized() {
+	if (!state || isComplete()) return false;
+	if (isCreaseValidForCurrentInnings()) return true;
+	return openInningsOpenerModal();
 }
 function matchTitleText(s) {
 	const a = s.players_a || s.players || 7;
@@ -2723,6 +2928,215 @@ function showModal({
 		modalResolve = res;
 	});
 }
+function addPlayerSelect(container, label, players, options = {}) {
+	const row = document.createElement("div");
+	row.className = "modal-custom-row";
+	const labelEl = document.createElement("label");
+	labelEl.textContent = label;
+	const select = document.createElement("select");
+	select.className = "app-select";
+	select.required = options.required !== false;
+	const placeholder = document.createElement("option");
+	placeholder.value = "";
+	placeholder.textContent = options.emptyLabel || "Select a player";
+	placeholder.disabled = select.required && !options.allowEmpty;
+	placeholder.selected = true;
+	select.append(placeholder);
+	(players || []).forEach((player) => {
+		const option = document.createElement("option");
+		option.value = player;
+		option.textContent = player;
+		select.append(option);
+	});
+	row.append(labelEl, select);
+	container.append(row);
+	if (options.value && (players || []).includes(options.value)) {
+		select.value = options.value;
+	}
+	enhanceSelect(select, { searchEnabled: (players || []).length > 8 });
+	return select;
+}
+async function saveCrease(crease, setAsOpeners = false) {
+	const payload = { ...crease };
+	if (setAsOpeners) payload.set_as_openers = true;
+	const result = await api("set_crease", "POST", payload, current);
+	state = result.state;
+	render();
+}
+async function openInningsOpenerModal() {
+	if (!isAdmin || !current || !state || isComplete()) return false;
+	const dismissed = dismissedPlayers();
+	const batters = battingRoster().filter((player) => !dismissed.has(player));
+	const bowlers = bowlingRoster();
+	if (!batters.length || !bowlers.length) {
+		await showError("No available batters or bowlers to start this innings.");
+		return false;
+	}
+
+	let strikerSelect;
+	let nonStrikerSelect;
+	let bowlerSelect;
+	const warning = document.createElement("p");
+	warning.className = "hint hidden";
+	warning.setAttribute("role", "alert");
+	warning.textContent = "Choose two different batters.";
+	const currentCrease = state.crease || state.openers || {};
+	const customContent = (container) => {
+		container.append(warning);
+		strikerSelect = addPlayerSelect(container, "Striker *", batters, {
+			value: currentCrease.striker,
+		});
+		nonStrikerSelect = addPlayerSelect(
+			container,
+			"Non-striker" + (batters.length > 1 ? " *" : ""),
+			batters,
+			{
+				value: currentCrease.non_striker,
+				required: batters.length > 1,
+				allowEmpty: batters.length <= 1,
+				emptyLabel: batters.length > 1 ? "Select a player" : "No non-striker",
+			},
+		);
+		bowlerSelect = addPlayerSelect(container, "Bowler *", bowlers, {
+			value: currentCrease.bowler,
+		});
+	};
+	const ok = await showModal({
+		title: `Innings ${state.innings} openers`,
+		message: "Select the batters and bowler to start this innings.",
+		confirmLabel: "Start innings",
+		showCancel: true,
+		customContent,
+		validate: () => {
+			if (
+				nonStrikerSelect.value &&
+				nonStrikerSelect.value === strikerSelect.value
+			) {
+				warning.classList.remove("hidden");
+				return false;
+			}
+			return true;
+		},
+	});
+	if (!ok) return false;
+	try {
+		await saveCrease(
+			{
+				striker: strikerSelect.value,
+				non_striker: nonStrikerSelect.value,
+				bowler: bowlerSelect.value,
+			},
+			true,
+		);
+		return true;
+	} catch (error) {
+		await showError(error.message);
+		return false;
+	}
+}
+async function changeBattersModal() {
+	if (!isAdmin || !current || !state || isComplete()) return;
+	if (!(await ensureCreaseInitialized())) return;
+	const dismissed = dismissedPlayers();
+	const batters = battingRoster().filter((player) => !dismissed.has(player));
+	if (batters.length < 2) {
+		await showError("There are not two available batters to change.");
+		return;
+	}
+
+	let strikerSelect;
+	let nonStrikerSelect;
+	const warning = document.createElement("p");
+	warning.className = "hint hidden";
+	warning.setAttribute("role", "alert");
+	warning.textContent = "Choose two different batters.";
+	const crease = state.crease || {};
+	const customContent = (container) => {
+		container.append(warning);
+		strikerSelect = addPlayerSelect(container, "Striker *", batters, {
+			value: crease.striker,
+		});
+		nonStrikerSelect = addPlayerSelect(container, "Non-striker *", batters, {
+			value: crease.non_striker,
+		});
+	};
+	const ok = await showModal({
+		title: "Change batters",
+		message: "Choose the two batters at the crease.",
+		confirmLabel: "Save batters",
+		showCancel: true,
+		customContent,
+		validate: () => {
+			if (strikerSelect.value === nonStrikerSelect.value) {
+				warning.classList.remove("hidden");
+				return false;
+			}
+			return true;
+		},
+	});
+	if (!ok) return;
+	try {
+		await saveCrease({
+			striker: strikerSelect.value,
+			non_striker: nonStrikerSelect.value,
+			bowler: state.crease.bowler,
+		});
+	} catch (error) {
+		await showError(error.message);
+	}
+}
+async function chooseNextBowlerModal(previousBowler, currentBowler, canDismiss = true) {
+	if (!isAdmin || !current || !state || isComplete()) return false;
+	const bowlers = bowlingRoster();
+	const previous = previousBowler ? formatPlayerName(previousBowler) : "";
+	let choices = bowlers.filter((player) => player !== previous);
+	if (!choices.length) choices = bowlers;
+	if (!choices.length) {
+		await showError("No available bowlers for this innings.");
+		return false;
+	}
+	let bowlerSelect;
+	const customContent = (container) => {
+		bowlerSelect = addPlayerSelect(container, "Next bowler *", choices, {
+			value: currentBowler && choices.includes(formatPlayerName(currentBowler))
+				? formatPlayerName(currentBowler)
+				: "",
+		});
+	};
+	const ok = await showModal({
+		title: "Choose bowler",
+		message: previous
+			? `${previous} bowled the previous over. Select a different bowler.`
+			: "Select the bowler for the next over.",
+		confirmLabel: "Set bowler",
+		showCancel: canDismiss,
+		customContent,
+	});
+	if (!ok) return false;
+	try {
+		await saveCrease({
+			striker: state.crease.striker,
+			non_striker: state.crease.non_striker || "",
+			bowler: bowlerSelect.value,
+		});
+		return true;
+	} catch (error) {
+		await showError(error.message);
+		return false;
+	}
+}
+function getPreviousOverBowler() {
+	const overs = groupOvers((state && state.deliveries) || []);
+	for (let i = overs.length - 1; i >= 0; i--) {
+		if (!overs[i].complete) continue;
+		for (let j = overs[i].balls.length - 1; j >= 0; j--) {
+			if (overs[i].balls[j].bowler) {
+				return formatPlayerName(overs[i].balls[j].bowler);
+			}
+		}
+	}
+	return null;
+}
 function showError(message) {
 	return showModal({
 		title: "Error",
@@ -3754,11 +4168,15 @@ $("modal").onclick = (e) => {
 		closeModal(false);
 };
 window.addEventListener("popstate", async (event) => {
-	const route = event.state;
-	if (!route || !route.cricketScreen) return;
+	const resolved = window.CricketRouter.resolve();
+	const route =
+		event.state && event.state.cricketScreen
+			? event.state
+			: { cricketScreen: resolved.name, matchId: resolved.matchId };
 
 	switch (route.cricketScreen) {
 		case "matches":
+			mainTab = "matches";
 			stopPoll();
 			current = null;
 			editingMatch = false;
@@ -3772,11 +4190,21 @@ window.addEventListener("popstate", async (event) => {
 			show("login");
 			break;
 		case "setup-create":
+			if (!isAdmin) {
+				setRoute("login", null, "replace");
+				show("login");
+				break;
+			}
 			stopPoll();
 			editingMatch = false;
 			fillSetup("create");
 			break;
 		case "setup-edit":
+			if (!isAdmin) {
+				setRoute("login", null, "replace");
+				show("login");
+				break;
+			}
 			if (!route.matchId) return;
 			try {
 				await openMatch(route.matchId, null);
