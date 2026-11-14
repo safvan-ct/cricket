@@ -2,6 +2,19 @@
 $configPath = __DIR__ . '/config/config.php';
 $config = file_exists($configPath) ? require $configPath : [];
 $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
+$appVersion = substr(hash('sha256', implode('|', [
+  hash_file('sha256', __FILE__),
+  hash_file('sha256', __DIR__ . '/sw.js'),
+  hash_file('sha256', __DIR__ . '/assets/style.css'),
+  hash_file('sha256', __DIR__ . '/assets/app.js'),
+  hash_file('sha256', __DIR__ . '/assets/qrcode.min.js'),
+  hash_file('sha256', __DIR__ . '/assets/favicon.svg'),
+  hash_file('sha256', __DIR__ . '/assets/icon-192.png'),
+  hash_file('sha256', __DIR__ . '/assets/icon-512.png'),
+  hash_file('sha256', __DIR__ . '/manifest.webmanifest'),
+  hash_file('sha256', __DIR__ . '/api/index.php'),
+])), 0, 16);
+header('Cache-Control: no-cache, no-store, must-revalidate');
 ?>
 <!doctype html>
 <html lang="en">
@@ -16,11 +29,10 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
   <meta name="theme-color" content="#002868">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Cricket">
-  <link rel="stylesheet" href="assets/choices.min.css?v=<?php echo filemtime(__DIR__ . '/assets/choices.min.css') ?>">
-  <link rel="stylesheet" href="assets/style.css?v=<?php echo filemtime(__DIR__ . '/assets/style.css') ?>">
+  <link rel="stylesheet" href="assets/style.css?v=<?php echo $appVersion ?>">
 </head>
 
-<body data-qr-url="<?php echo htmlspecialchars($qrUrl, ENT_QUOTES, 'UTF-8'); ?>">
+<body data-qr-url="<?php echo htmlspecialchars($qrUrl, ENT_QUOTES, 'UTF-8'); ?>" data-app-version="<?php echo htmlspecialchars($appVersion, ENT_QUOTES, 'UTF-8'); ?>">
   <header>
     <div class="brand"><span class="ball">●</span>
       <div><b>CRICKET</b><small>LIVE SCOREBOARD</small></div>
@@ -67,21 +79,42 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
     <section id="app" class="hidden">
       <div class="topline">
         <div>
-          <p class="eyebrow">MATCH CENTRE</p>
+          <!-- <p class="eyebrow">MATCH CENTRE</p> -->
           <h1>Scoreboard</h1>
         </div>
         <button id="newMatch" class="primary">＋ New match</button>
         <button id="updateMatch" class="primary hidden">Update match info</button>
       </div>
 
-      <div class="main-tabs" id="mainTabs">
-        <button type="button" id="tabMatches" class="main-tab-btn active">🏏 Matches</button>
-        <button type="button" id="tabStats" class="main-tab-btn">📊 Player Stats</button>
-      </div>
-
-      <div id="matchesView" class="panel">
-        <h2>Saved matches</h2>
-        <div id="matchList" class="match-list"></div>
+      <div id="matchesView">
+        <div class="home-tabs" role="tablist" aria-label="Home">
+          <button id="savedMatchesTab" class="home-tab" type="button" role="tab" aria-selected="true" aria-controls="savedMatchesPanel" tabindex="0">Saved matches</button>
+          <button id="tossTab" class="home-tab" type="button" role="tab" aria-selected="false" aria-controls="tossPanel" tabindex="-1">Toss</button>
+        </div>
+        <section id="savedMatchesPanel" class="panel home-tabpanel" role="tabpanel" aria-labelledby="savedMatchesTab" tabindex="0">
+          <h2>Saved matches</h2>
+          <div id="matchList" class="match-list"></div>
+        </section>
+        <section id="tossPanel" class="panel home-tabpanel" role="tabpanel" aria-labelledby="tossTab" tabindex="0" hidden>
+          <section class="coin-toss" aria-labelledby="coinTossTitle" aria-busy="false">
+            <div class="coin-toss-copy">
+              <p class="coin-toss-eyebrow">QUICK DECIDER <span>·</span> 50 / 50</p>
+              <h3 id="coinTossTitle">Leave it to chance.</h3>
+              <p class="coin-toss-description">One quick flip to settle heads or tails.</p>
+              <p id="coinTossResult" class="coin-toss-result" role="status" aria-live="polite" aria-atomic="true">Ready when you are.</p>
+            </div>
+            <div class="coin-toss-action">
+              <div class="coin-stage" aria-hidden="true">
+                <span class="coin-stage-caption">HEADS OR TAILS</span>
+                <div class="coin" id="coin" aria-hidden="true">?</div>
+              </div>
+              <button type="button" id="flipCoin" class="primary coin-flip">
+                <span class="coin-flip-icon" aria-hidden="true">↻</span>
+                <span id="flipCoinLabel">Flip coin</span>
+              </button>
+            </div>
+          </section>
+        </section>
       </div>
 
       <div id="statsView" class="panel hidden">
@@ -134,47 +167,13 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
 
         <form id="setupForm" class="form-stack">
           <div class="team-block">
-            <div class="team-inputs-row">
-              <label class="team-name-col">Team A name<input id="teamA" required value="PAREL"></label>
-              <label class="team-players-col">Players<input id="playersA" type="number" min="2" max="15" value="7" required></label>
-            </div>
-            <div id="rosterAWrap" class="roster-wrap">
-              <div class="roster-header-row">
-                <span class="subhead roster-title">Team A Players (<span id="countA">0</span>/<span id="maxA">7</span>)</span>
-                <button type="button" id="autoFillA" class="ghost-btn-sm">Auto-fill</button>
-              </div>
-              <div id="selectedChipsA" class="selected-chips"></div>
-              <div class="chip-input-row">
-                <input type="text" id="playerSearchA" class="chip-search-input" placeholder="Search or add player...">
-                <button type="button" id="addChipA" class="chip-add-btn">Add</button>
-              </div>
-              <div class="pool-wrap">
-                <span class="pool-hint">Tap from common pool:</span>
-                <div id="poolChipsA" class="pool-chips"></div>
-              </div>
-            </div>
+            <label>Team A<input id="teamA" required value="PAREL"></label>
+            <label>Players<input id="playersA" type="number" min="2" max="15" value="7" required></label>
           </div>
 
           <div class="team-block">
-            <div class="team-inputs-row">
-              <label class="team-name-col">Team B name<input id="teamB" required value="BNA"></label>
-              <label class="team-players-col">Players<input id="playersB" type="number" min="2" max="15" value="7" required></label>
-            </div>
-            <div id="rosterBWrap" class="roster-wrap">
-              <div class="roster-header-row">
-                <span class="subhead roster-title">Team B Players (<span id="countB">0</span>/<span id="maxB">7</span>)</span>
-                <button type="button" id="autoFillB" class="ghost-btn-sm">Auto-fill</button>
-              </div>
-              <div id="selectedChipsB" class="selected-chips"></div>
-              <div class="chip-input-row">
-                <input type="text" id="playerSearchB" class="chip-search-input" placeholder="Search or add player...">
-                <button type="button" id="addChipB" class="chip-add-btn">Add</button>
-              </div>
-              <div class="pool-wrap">
-                <span class="pool-hint">Tap from common pool:</span>
-                <div id="poolChipsB" class="pool-chips"></div>
-              </div>
-            </div>
+            <label>Team B<input id="teamB" required value="BNI"></label>
+            <label>Players<input id="playersB" type="number" min="2" max="15" value="7" required></label>
           </div>
 
           <label>Overs per innings<input id="overs" type="number" min="1" max="50" value="6" required></label>
@@ -188,7 +187,7 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
               </label>
               <label class="toss-radio">
                 <input type="radio" name="batting" id="battingB" value="B">
-                <span class="toss-pill" id="pillB">BNA</span>
+                <span class="toss-pill" id="pillB">BNI</span>
               </label>
             </div>
             <p id="tossNote" class="hint hidden">Toss is locked after the first ball.</p>
@@ -199,7 +198,7 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
       </div>
 
       <div id="scoreView" class="hidden">
-        <div class="section-head"><button id="back" class="ghost">← Matches</button>
+        <div class="section-head"><button id="back" class="ghost" style="padding: 5px;">← Matches</button>
           <span id="matchTitle" class="eyebrow"></span>
         </div>
         <div class="score-hero">
@@ -286,7 +285,7 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
             <button id="undo" class="ghost">↶ Undo</button>
             <button id="endInnings" class="ghost">End innings</button>
             <button id="endMatch" class="ghost hidden">End match</button>
-            <button data-extra="overthrow" class="ghost">Ovr 4</button>
+            <button data-extra="overthrow" class="ghost">OT 4</button>
           </div>
           <p id="actionMessage" class="hint">Tap a run, or an extra / wicket to add on runs.</p>
         </div>
@@ -315,24 +314,52 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
       </div>
       <div id="modalBalls" class="modal-balls hidden"></div>
       <div id="modalFields" class="modal-fields hidden">
+        <div class="modal-extra-type">
+          <span>Delivery type</span>
+          <div id="modalExtraTypePills" class="modal-type-pills" role="radiogroup" aria-label="Delivery type">
+            <label class="modal-type-pill">
+              <input type="radio" name="modalExtraTypePill" value="" aria-label="Normal delivery">
+              <span>Normal</span>
+            </label>
+            <label class="modal-type-pill">
+              <input type="radio" name="modalExtraTypePill" value="wide" aria-label="Wide">
+              <span>Wide</span>
+            </label>
+            <label class="modal-type-pill">
+              <input type="radio" name="modalExtraTypePill" value="no-ball" aria-label="No-ball">
+              <span>No-ball</span>
+            </label>
+            <label class="modal-type-pill">
+              <input type="radio" name="modalExtraTypePill" value="overthrow" aria-label="Overthrow (OT)">
+              <span title="Overthrow">OT 4</span>
+            </label>
+          </div>
+          <select id="modalExtraType" class="hidden" aria-hidden="true" tabindex="-1">
+            <option value="">Normal delivery</option>
+            <option value="wide">Wide</option>
+            <option value="no-ball">No-ball</option>
+            <option value="overthrow">Overthrow</option>
+            <option value="bye">Bye</option>
+            <option value="leg-bye">Leg-bye</option>
+            <option value="penalty">Penalty</option>
+          </select>
+        </div>
         <p id="modalAddonLabel" class="modal-addon-label">Add-on runs</p>
         <div class="modal-addon" role="radiogroup" aria-label="Add-on runs">
-          <label class="modal-addon-opt" data-addon="0"><input type="radio" name="modalAddon" value="0">0</label>
-          <label class="modal-addon-opt" data-addon="1"><input type="radio" name="modalAddon" value="1">1</label>
-          <label class="modal-addon-opt" data-addon="2"><input type="radio" name="modalAddon" value="2">2</label>
-          <label class="modal-addon-opt" data-addon="3"><input type="radio" name="modalAddon" value="3">3</label>
-          <label class="modal-addon-opt" data-addon="4"><input type="radio" name="modalAddon" value="4">4</label>
-          <label class="modal-addon-opt" data-addon="5"><input type="radio" name="modalAddon" value="5">5</label>
-          <label class="modal-addon-opt" data-addon="6"><input type="radio" name="modalAddon" value="6">6</label>
-          <label class="modal-addon-opt" data-addon="7"><input type="radio" name="modalAddon" value="7">7</label>
+          <label class="modal-addon-opt addon-zero"><input type="radio" name="modalAddon" value="0" checked>0</label>
+          <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="1">1</label>
+          <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="2">2</label>
+          <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="3">3</label>
+          <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="4">4</label>
+          <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="5">5</label>
+          <label class="modal-addon-opt"><input type="radio" name="modalAddon" value="6">6</label>
+          <label class="modal-addon-opt addon-max"><input type="radio" name="modalAddon" value="7">7</label>
         </div>
         <label id="modalWicketRow" class="modal-check">
-          <span class="wicket-check-content">
-            <span class="wicket-check-icon">☝️</span>
-            <span class="wicket-check-text">
-              <strong>Wicket</strong>
-              <small>(Run out, stumping, hit wicket)</small>
-            </span>
+          <span class="modal-wicket-icon" aria-hidden="true">👆</span>
+          <span class="modal-wicket-copy">
+            <span class="modal-wicket-title">Wicket</span>
+            <span class="modal-wicket-sub">(Record all types of wickets.)</span>
           </span>
           <input id="modalWicket" type="checkbox">
         </label>
@@ -345,9 +372,8 @@ $qrUrl = $config['app_url'] ?? $config['qr_url'] ?? $config['qr_value'] ?? '';
     </div>
   </div>
 
-  <script src="assets/choices.min.js?v=<?php echo filemtime(__DIR__ . '/assets/choices.min.js') ?>"></script>
-  <script src="assets/qrcode.min.js?v=<?php echo filemtime(__DIR__ . '/assets/qrcode.min.js') ?>"></script>
-  <script src="assets/app.js?v=<?php echo filemtime(__DIR__ . '/assets/app.js') ?>"></script>
+  <script src="assets/qrcode.min.js?v=<?php echo $appVersion ?>"></script>
+  <script src="assets/app.js?v=<?php echo $appVersion ?>"></script>
 </body>
 
 </html>

@@ -1,38 +1,19 @@
 <?php
 
 declare(strict_types=1);
-
-$sessionLifetime = 30 * 86400; // 30 days
-@ini_set('session.gc_maxlifetime', (string)$sessionLifetime);
-@ini_set('session.cookie_lifetime', (string)$sessionLifetime);
-
-$sessionSavePath = __DIR__ . '/../storage/sessions';
-if (!is_dir($sessionSavePath)) {
-  @mkdir($sessionSavePath, 0750, true);
-  if (is_dir($sessionSavePath)) {
-    @file_put_contents($sessionSavePath . '/.htaccess', "Require all denied\nDeny from all\n");
-  }
-}
-if (is_dir($sessionSavePath) && is_writable($sessionSavePath)) {
-  @session_save_path($sessionSavePath);
-}
-
-$isHttps = (
-  (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
-  (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string)$_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') ||
-  (!empty($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443)
-);
-
-session_name('cricket_admin_session');
+const ADMIN_SESSION_LIFETIME = 2592000;
+ini_set('session.gc_maxlifetime', (string) ADMIN_SESSION_LIFETIME);
+$cookieParams = session_get_cookie_params();
+$isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+  || (int)($_SERVER['SERVER_PORT'] ?? 0) === 443;
 session_set_cookie_params([
-  'lifetime' => $sessionLifetime,
-  'path' => '/',
-  'domain' => '',
-  'secure' => $isHttps,
+  'lifetime' => ADMIN_SESSION_LIFETIME,
+  'path' => $cookieParams['path'],
+  'domain' => $cookieParams['domain'],
+  'secure' => $isHttps || $cookieParams['secure'],
   'httponly' => true,
-  'samesite' => 'Lax'
+  'samesite' => 'Lax',
 ]);
-
 session_start();
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -947,6 +928,84 @@ if ($action === 'delivery') {
     $s['openers'] = $b['openers'];
   }
   applyAutoClose($s);
+  saveMatch($pdo, $id, $s);
+  $pdo->commit();
+  respond(['ok' => true, 'state' => $s]);
+}
+if ($action === 'edit_delivery') {
+  requireAdmin();
+  $b = body();
+  $innings = filter_var($b['innings'] ?? null, FILTER_VALIDATE_INT);
+  $index = filter_var($b['index'] ?? null, FILTER_VALIDATE_INT);
+  if ($innings === false || !in_array($innings, [1, 2], true) || $index === false || $index < 0) {
+    respond(['error' => 'Invalid delivery'], 422);
+  }
+  $pdo->beginTransaction();
+  $s = loadMatchForUpdate($pdo, $id);
+  if (($s['status'] ?? '') !== 'live' || !empty($s['locked'])) {
+    $pdo->rollBack();
+    respond(['error' => 'Only deliveries in a live, unlocked match can be edited'], 422);
+  }
+  $currentInnings = (int)($s['innings'] ?? 1);
+  if ($innings === 1 && $currentInnings === 1) {
+    $deliveries = $s['deliveries'] ?? [];
+    $location = 'current';
+  } elseif ($innings === 1 && $currentInnings === 2 && isset($s['innings_1'])) {
+    $deliveries = $s['innings_1']['deliveries'] ?? [];
+    $location = 'first';
+  } elseif ($innings === 2 && $currentInnings === 2) {
+    $deliveries = $s['deliveries'] ?? [];
+    $location = 'current';
+  } else {
+    $pdo->rollBack();
+    respond(['error' => 'This innings cannot be edited'], 422);
+  }
+  if (!array_key_exists($index, $deliveries)) {
+    $pdo->rollBack();
+    respond(['error' => 'Delivery not found'], 404);
+  }
+  if (!is_array($b['delivery'] ?? null)) {
+    $pdo->rollBack();
+    respond(['error' => 'Invalid delivery'], 422);
+  }
+  $d = array_merge($deliveries[$index], $b['delivery']);
+  $allowed = ['runs', 'extra_type', 'extra_runs', 'wicket', 'dismissal', 'dismissed_player', 'batter', 'bowler'];
+  $item = [];
+  foreach ($allowed as $key) {
+    $item[$key] = $d[$key] ?? null;
+  }
+  $item['extra_type'] = $item['extra_type'] ?? '';
+  $item['runs'] = max(0, min(6, (int)$item['runs']));
+  $item['extra_runs'] = max(0, min(10, (int)$item['extra_runs']));
+  $item['wicket'] = !empty($item['wicket']);
+  $item['dismissal'] = $item['wicket'] ? ((string)$item['dismissal'] ?: 'bowled') : '';
+  $item['created'] = $deliveries[$index]['created'] ?? date('c');
+  if (!in_array($item['extra_type'], ['', 'wide', 'no-ball', 'bye', 'leg-bye', 'penalty', 'overthrow'], true)) {
+    $pdo->rollBack();
+    respond(['error' => 'Invalid extra type'], 422);
+  }
+  $deliveries[$index] = $item;
+  $stats = inningsStats($deliveries);
+  $firstSide = (($s['batting_first'] ?? 'A') === 'B') ? 'B' : 'A';
+  $battingSideForEdit = $innings === 1 ? $firstSide : ($firstSide === 'A' ? 'B' : 'A');
+  $playersForEdit = $battingSideForEdit === 'B'
+    ? (int)($s['players_b'] ?? $s['players'] ?? 7)
+    : (int)($s['players_a'] ?? $s['players'] ?? 7);
+  if ($stats['legal'] > (int)($s['overs_limit'] ?? 0) * 6 || $stats['w'] > $playersForEdit) {
+    $pdo->rollBack();
+    respond(['error' => 'The edited delivery would exceed this innings limit'], 422);
+  }
+  if ($location === 'current') {
+    $s['deliveries'] = $deliveries;
+    applyAutoClose($s);
+  } else {
+    $s['innings_1']['deliveries'] = $deliveries;
+    $s['innings_1']['total'] = $stats['total'];
+    $s['innings_1']['wickets'] = $stats['w'];
+    $s['innings_1']['legal'] = $stats['legal'];
+    $s['target'] = $stats['total'] + 1;
+    applyAutoClose($s);
+  }
   saveMatch($pdo, $id, $s);
   $pdo->commit();
   respond(['ok' => true, 'state' => $s]);

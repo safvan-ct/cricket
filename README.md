@@ -24,14 +24,15 @@ Visit `https://your-domain.com/` (or the subdirectory where you uploaded it). Si
 ## Included
 - Create matches with team names, player count, overs and batting-first selection.
 - Player numbers instead of player names.
+- Daily team-pair series summaries with completed win totals and series margins.
 - Runs, wides, no-balls, byes, leg-byes and penalty extras.
 - Wicket and dismissal type entry.
 - Live innings total, wickets, overs, run rate, extras and legal-ball count.
-- Basic batting and bowling tables, recent deliveries and undo-last-delivery.
+- Basic batting and bowling tables, recent deliveries, live delivery editing and undo-last-delivery.
 - Saved matches stored in MySQL.
 
 ## Important limitations
-This is a starter scoring application, not a fully validated official scoring engine. It currently supports one innings per match and one admin login. Strike rotation, end changes, full bowling legality, run-outs involving non-strikers, retired hurt/retired out rules, partnerships, fall of wickets, second innings/target calculation, match result, and ball-by-ball editing are not fully implemented. Validate the scoring logic before using it for an official match. Use HTTPS and a strong admin password. For multiple scorers or public live score viewing, add role-based authentication and a proper event/audit model.
+This is a starter scoring application, not a fully validated official scoring engine. It currently supports one innings per match and one admin login. Strike rotation, end changes, full bowling legality, run-outs involving non-strikers, retired hurt/retired out rules, partnerships, fall of wickets, second innings/target calculation, and match result are not fully implemented. Deliveries can be edited only while a match is live and unlocked. Validate the scoring logic before using it for an official match. Use HTTPS and a strong admin password. For multiple scorers or public live score viewing, add role-based authentication and a proper event/audit model.
 
 ## Troubleshooting
 - **Setup required:** create `config/config.php` from `config.example.php`.
