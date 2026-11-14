@@ -151,7 +151,7 @@ if ($("qrBtn")) {
 		const url = getAppQrUrl();
 		showModal({
 			title: "Scan to open app",
-			message: "Scan with your phone camera to view the live scoreboard.",
+			message: "Scan with your phone camera to view the live score.",
 			confirmLabel: "Close",
 			showCancel: false,
 			qr: url,

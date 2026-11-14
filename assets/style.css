@@ -1103,7 +1103,7 @@ td:first-child {
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin: 14px 0 16px
+    margin: 10px 0 0px
 }
 
 .modal-qr.hidden {
