@@ -43,14 +43,25 @@ function readScoreId() {
 	const m = String(location.hash || "").match(/^#m=(\d+)$/);
 	return m ? m[1] : null;
 }
-function rememberMatch(id) {
-	const next = "#m=" + id;
-	if (location.hash !== next)
-		history.replaceState(null, "", location.pathname + location.search + next);
+function setRoute(screen, matchId = null, mode = "push") {
+	const url = new URL(location.href);
+	url.hash = matchId ? "m=" + matchId : "";
+	const routeState = {
+		...(history.state || {}),
+		cricketScreen: screen,
+		matchId: matchId || null,
+	};
+	history[mode === "replace" ? "replaceState" : "pushState"](
+		routeState,
+		"",
+		url,
+	);
+}
+function rememberMatch(id, mode = "push") {
+	setRoute("score", id, mode);
 }
 function forgetMatch() {
-	if (location.hash)
-		history.replaceState(null, "", location.pathname + location.search);
+	setRoute("matches", null, "replace");
 }
 function stopPoll() {
 	if (pollTimer) {
@@ -125,12 +136,13 @@ async function boot() {
 	const id = readScoreId();
 	if (id) {
 		try {
-			await openMatch(id);
+			await openMatch(id, "replace");
 			return;
 		} catch (e) {
 			forgetMatch();
 		}
 	}
+	setRoute("matches", null, "replace");
 	show("app");
 	loadMatches();
 }
@@ -148,6 +160,7 @@ if ($("qrBtn")) {
 }
 $("loginBtn").onclick = () => {
 	$("loginError").textContent = "";
+	setRoute("login", current);
 	show("login");
 };
 $("togglePassword").onclick = () => {
@@ -162,7 +175,11 @@ $("togglePassword").onclick = () => {
 };
 $("backToMatches").onclick = () => {
 	forgetMatch();
+	current = null;
+	editingMatch = false;
+	stopPoll();
 	show("app");
+	headerMode();
 	loadMatches();
 };
 $("loginForm").onsubmit = async (e) => {
@@ -173,6 +190,9 @@ $("loginForm").onsubmit = async (e) => {
 		isAdmin = true;
 		applyRole();
 		forgetMatch();
+		current = null;
+		editingMatch = false;
+		stopPoll();
 		show("app");
 		loadMatches();
 	} catch (err) {
@@ -237,27 +257,17 @@ $("newMatch").onclick = () => {
 	if (!isAdmin) return;
 	stopPoll();
 	editingMatch = false;
+	setRoute("setup-create");
 	fillSetup("create");
 };
 $("updateMatch").onclick = () => {
 	if (!isAdmin || !current || !state || state.status === "complete") return;
 	stopPoll();
+	setRoute("setup-edit", current);
 	fillSetup("update");
 };
 $("cancelSetup").onclick = () => {
-	if (editingMatch && current) {
-		editingMatch = false;
-		$("setupView").classList.add("hidden");
-		$("scoreView").classList.remove("hidden");
-		headerMode();
-		startViewerPoll();
-		return;
-	}
-	editingMatch = false;
-	forgetMatch();
-	show("app");
-	headerMode();
-	loadMatches();
+	history.back();
 };
 $("back").onclick = () => {
 	stopPoll();
@@ -297,6 +307,7 @@ $("setupForm").onsubmit = async (e) => {
 			state = r.state;
 			$("matchTitle").textContent = matchTitleText(state);
 			editingMatch = false;
+			setRoute("score", current, "replace");
 			$("setupView").classList.add("hidden");
 			$("scoreView").classList.remove("hidden");
 			headerMode();
@@ -304,7 +315,7 @@ $("setupForm").onsubmit = async (e) => {
 			startViewerPoll();
 		} else {
 			const r = await api("create", "POST", body);
-			await openMatch(r.id);
+			await openMatch(r.id, "replace");
 		}
 	} catch (err) {
 		showError(err.message);
@@ -492,7 +503,7 @@ function esc(s) {
 			],
 	);
 }
-async function openMatch(id) {
+async function openMatch(id, historyMode = "push") {
 	const r = await api("get", "GET", null, id);
 	current = id;
 	state = r.state;
@@ -510,7 +521,7 @@ async function openMatch(id) {
 	fillPlayers();
 	render();
 	startViewerPoll();
-	rememberMatch(id);
+	if (historyMode) rememberMatch(id, historyMode);
 }
 function fillPlayers() {
 	const countA = state.players_a || state.players;
@@ -1314,4 +1325,47 @@ $("modal").onclick = (e) => {
 	if (e.target === $("modal") && $("modal").dataset.allowDismiss === "1")
 		closeModal(false);
 };
+window.addEventListener("popstate", async (event) => {
+	const route = event.state;
+	if (!route || !route.cricketScreen) return;
+
+	switch (route.cricketScreen) {
+		case "matches":
+			stopPoll();
+			current = null;
+			editingMatch = false;
+			setPendingExtra("");
+			show("app");
+			headerMode();
+			loadMatches();
+			break;
+		case "login":
+			stopPoll();
+			show("login");
+			break;
+		case "setup-create":
+			stopPoll();
+			editingMatch = false;
+			fillSetup("create");
+			break;
+		case "setup-edit":
+			if (!route.matchId) return;
+			try {
+				await openMatch(route.matchId, null);
+				stopPoll();
+				fillSetup("update");
+			} catch (error) {
+				showError(error.message);
+			}
+			break;
+		case "score":
+			if (!route.matchId) return;
+			try {
+				await openMatch(route.matchId, null);
+			} catch (error) {
+				showError(error.message);
+			}
+			break;
+	}
+});
 boot();

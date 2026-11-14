@@ -206,7 +206,7 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
           <span class="modal-wicket-icon" aria-hidden="true">👆</span>
           <span class="modal-wicket-copy">
             <span class="modal-wicket-title">Wicket</span>
-            <span class="modal-wicket-sub">(Run out, stumping, hit wicket)</span>
+            <span class="modal-wicket-sub">(Record all types of wickets.)</span>
           </span>
           <input id="modalWicket" type="checkbox">
         </label>
