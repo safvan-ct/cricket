@@ -371,6 +371,36 @@ button {
     padding: 0 12px 12px
 }
 
+.match-series {
+    display: grid;
+    gap: 8px
+}
+
+.match-series-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: #f3f7fc
+}
+
+.match-series-teams {
+    font-size: 13px
+}
+
+.match-series-result {
+    color: var(--blue);
+    font-size: 12px;
+    font-weight: 800
+}
+
+.match-series-result.in-progress {
+    color: var(--muted)
+}
+
 /* Controls */
 .subhead {
     font-size: 10px;

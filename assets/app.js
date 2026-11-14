@@ -345,6 +345,53 @@ function matchDayLabel(key) {
 	if (diff === 1) return "Yesterday · " + nice;
 	return nice;
 }
+function seriesTeamKey(name) {
+	return String(name || "").trim().toLocaleLowerCase();
+}
+function matchSeriesKey(match) {
+	const state = match.state || {};
+	return JSON.stringify(
+		[state.team_a, state.team_b].map(seriesTeamKey).sort(),
+	);
+}
+function seriesSummary(matches) {
+	const firstState = matches[0].state || {};
+	const teams = [
+		{ name: String(firstState.team_a || "Team A"), key: seriesTeamKey(firstState.team_a) },
+		{ name: String(firstState.team_b || "Team B"), key: seriesTeamKey(firstState.team_b) },
+	];
+	const wins = [0, 0];
+	let allComplete = true;
+
+	matches.forEach((match) => {
+		const state = match.state || {};
+		if (state.status !== "complete") {
+			allComplete = false;
+			return;
+		}
+		const winner = seriesTeamKey(state.result && state.result.winner);
+		const winnerIndex = teams.findIndex((team) => team.key === winner);
+		if (winner && winnerIndex !== -1) wins[winnerIndex]++;
+	});
+
+	const score = wins[0] + " - " + wins[1];
+	if (!allComplete) {
+		return {
+			teams,
+			result: (wins[0] === wins[1] ? "Series in progress · " : "Series lead · ") + score,
+			complete: false,
+		};
+	}
+	if (wins[0] === wins[1]) {
+		return { teams, result: "Series tied · " + score, complete: true };
+	}
+	const winnerIndex = wins[0] > wins[1] ? 0 : 1;
+	return {
+		teams,
+		result: teams[winnerIndex].name + " won series · " + score,
+		complete: true,
+	};
+}
 function cardInnings(deliveries) {
 	let total = 0,
 		w = 0,
@@ -436,6 +483,25 @@ function makeMatchCard(m) {
 	d.append(info, actions);
 	return d;
 }
+function makeSeriesGroup(matches) {
+	const summary = seriesSummary(matches);
+	const series = document.createElement("section");
+	series.className = "match-series";
+
+	const heading = document.createElement("div");
+	heading.className = "match-series-heading";
+	const teams = document.createElement("strong");
+	teams.className = "match-series-teams";
+	teams.textContent = summary.teams[0].name + " vs " + summary.teams[1].name;
+	const result = document.createElement("span");
+	result.className =
+		"match-series-result" + (summary.complete ? "" : " in-progress");
+	result.textContent = summary.result;
+	heading.append(teams, result);
+	series.append(heading);
+	matches.forEach((match) => series.append(makeMatchCard(match)));
+	return series;
+}
 async function markMatchFromCard(m) {
 	const wasLive = (m.state.status || "") !== "complete";
 	const ok = await showModal({
@@ -486,7 +552,13 @@ async function loadMatches() {
 			details.append(summary);
 			const body = document.createElement("div");
 			body.className = "match-day-body";
-			groups[key].forEach((m) => body.append(makeMatchCard(m)));
+			const seriesGroups = new Map();
+			groups[key].forEach((match) => {
+				const seriesKey = matchSeriesKey(match);
+				if (!seriesGroups.has(seriesKey)) seriesGroups.set(seriesKey, []);
+				seriesGroups.get(seriesKey).push(match);
+			});
+			seriesGroups.forEach((matches) => body.append(makeSeriesGroup(matches)));
 			details.append(body);
 			$("matchList").append(details);
 		});

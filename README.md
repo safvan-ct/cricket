@@ -24,6 +24,7 @@ Visit `https://your-domain.com/` (or the subdirectory where you uploaded it). Si
 ## Included
 - Create matches with team names, player count, overs and batting-first selection.
 - Player numbers instead of player names.
+- Daily team-pair series summaries with completed win totals and series margins.
 - Runs, wides, no-balls, byes, leg-byes and penalty extras.
 - Wicket and dismissal type entry.
 - Live innings total, wickets, overs, run rate, extras and legal-ball count.
