@@ -1,7 +1,7 @@
 Options -Indexes
 AddType application/manifest+json .webmanifest
 RewriteEngine On
-RewriteRule ^(?:matches(?:/new|/[0-9]+(?:/edit)?)?|login|stats)/?$ index.php [L,QSA]
+RewriteRule ^(?:matches(?:/new|/[0-9]+(?:/edit)?)?|login|stats|toss)/?$ index.php [L,QSA]
 <FilesMatch "^(README\.md|schema\.sql|config\.example\.php)$">
   Require all denied
 </FilesMatch>

@@ -67,88 +67,56 @@ function show(id) {
 	);
 	$(id).classList.remove("hidden");
 	if (id === "app") {
-		setHomeTab("savedMatchesTab");
-		$("matchesView").classList.remove("hidden");
 		$("setupView").classList.add("hidden");
 		$("scoreView").classList.add("hidden");
 		const mainTabs = $("mainTabs");
 		if (mainTabs) mainTabs.classList.remove("hidden");
-		if (mainTab === "stats") {
-			$("matchesView").classList.add("hidden");
-			$("statsView").classList.remove("hidden");
-		} else {
-			$("matchesView").classList.remove("hidden");
-			$("statsView").classList.add("hidden");
-		}
+		$("matchesView").classList.toggle("hidden", mainTab !== "matches");
+		$("statsView").classList.toggle("hidden", mainTab !== "stats");
+		$("tossView").classList.toggle("hidden", mainTab !== "toss");
 	}
 	syncMainTabButtons();
 	headerMode();
 }
-function setHomeTab(tabId) {
-	const tabs = [$("savedMatchesTab"), $("tossTab")];
-	tabs.forEach((tab) => {
-		const active = tab.id === tabId;
-		tab.setAttribute("aria-selected", String(active));
-		tab.tabIndex = active ? 0 : -1;
-		const panel = $(tab.getAttribute("aria-controls"));
-		panel.hidden = !active;
-		panel.classList.toggle("hidden", !active);
-	});
-}
-[$("savedMatchesTab"), $("tossTab")].forEach((tab, index, tabs) => {
-	tab.addEventListener("click", () => setHomeTab(tab.id));
-	tab.addEventListener("keydown", (event) => {
-		let nextIndex;
-		if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
-		else if (event.key === "ArrowLeft") nextIndex = (index + tabs.length - 1) % tabs.length;
-		else if (event.key === "Home") nextIndex = 0;
-		else if (event.key === "End") nextIndex = tabs.length - 1;
-		else return;
-		event.preventDefault();
-		tabs[nextIndex].focus();
-		setHomeTab(tabs[nextIndex].id);
-	});
-});
+const mainTabNames = ["matches", "stats", "toss"];
+const mainTabIds = {
+	matches: "matchesMainTab",
+	stats: "statsMainTab",
+	toss: "tossMainTab",
+};
 function syncMainTabButtons() {
-	const matchesTab = $("matchesMainTab");
-	const statsTab = $("statsMainTab");
-	if (!matchesTab || !statsTab) return;
-	[
-		[matchesTab, "matches"],
-		[statsTab, "stats"],
-	].forEach(([tab, name]) => {
+	mainTabNames.forEach((name) => {
+		const tab = $(mainTabIds[name]);
 		const active = mainTab === name;
 		tab.setAttribute("aria-selected", String(active));
 		tab.tabIndex = active ? 0 : -1;
 	});
 }
 function setMainTab(tabName, historyMode = "push") {
-	if (!["matches", "stats"].includes(tabName)) return;
+	if (!mainTabNames.includes(tabName)) return;
 	const changed = mainTab !== tabName;
 	mainTab = tabName;
 	if (changed || historyMode === "replace") setRoute(tabName, null, historyMode);
 	show("app");
 	syncMainTabButtons();
 	if (tabName === "stats") loadPlayerStats();
-	else loadMatches();
+	else if (tabName === "matches") loadMatches();
 }
-[
-	[$("matchesMainTab"), "matches"],
-	[$("statsMainTab"), "stats"],
-].forEach(([tab, name]) => {
+mainTabNames.forEach((name) => {
+	const tab = $(mainTabIds[name]);
 	tab.addEventListener("click", () => setMainTab(name));
 	tab.addEventListener("keydown", (event) => {
 		if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
 		event.preventDefault();
-		const currentIndex = name === "matches" ? 0 : 1;
+		const currentIndex = mainTabNames.indexOf(name);
 		const nextIndex =
 			event.key === "Home"
 				? 0
 				: event.key === "End"
-					? 1
-					: (currentIndex + (event.key === "ArrowRight" ? 1 : -1) + 2) % 2;
-		const nextName = nextIndex === 0 ? "matches" : "stats";
-		$(nextName === "stats" ? "statsMainTab" : "matchesMainTab").focus();
+					? mainTabNames.length - 1
+					: (currentIndex + (event.key === "ArrowRight" ? 1 : -1) + mainTabNames.length) % mainTabNames.length;
+		const nextName = mainTabNames[nextIndex];
+		$(mainTabIds[nextName]).focus();
 		setMainTab(nextName);
 	});
 });
@@ -326,6 +294,11 @@ async function boot() {
 			show("app");
 			loadPlayerStats();
 			return;
+		case "toss":
+			mainTab = "toss";
+			setRoute("toss", null, "replace");
+			show("app");
+			return;
 	}
 	mainTab = "matches";
 	setRoute("matches", null, "replace");
@@ -501,6 +474,8 @@ function renderRosterChips() {
 	const maxA = Math.max(2, Math.min(15, parseInt($("playersA").value, 10) || 7));
 	const maxB = Math.max(2, Math.min(15, parseInt($("playersB").value, 10) || 7));
 
+	$("rosterTitleA").textContent = `${$("teamA").value.trim() || "Team A"} players`;
+	$("rosterTitleB").textContent = `${$("teamB").value.trim() || "Team B"} players`;
 	if ($("countA")) $("countA").textContent = selectedRosterA.length;
 	if ($("maxA")) $("maxA").textContent = maxA;
 	if ($("countB")) $("countB").textContent = selectedRosterB.length;
@@ -527,6 +502,7 @@ function renderRosterChips() {
 				btn.className = "sel-chip-remove";
 				btn.innerHTML = "&times;";
 				btn.title = "Remove from Team A";
+				btn.setAttribute("aria-label", `Remove ${name} from Team A`);
 				btn.onclick = () => {
 					selectedRosterA.splice(idx, 1);
 					renderRosterChips();
@@ -552,15 +528,19 @@ function renderRosterChips() {
 			hint.style.fontSize = "11px";
 			hint.textContent = qA
 				? "No matching players in directory."
-				: "All directory players selected.";
+				: commonPlayers.length
+					? "No available directory players."
+					: "Player directory is empty.";
 			poolA.append(hint);
 		} else {
 			listA.forEach((name) => {
-				const chip = document.createElement("span");
+				const chip = document.createElement("button");
+				chip.type = "button";
 				chip.className = "pool-chip";
 				chip.textContent = name;
 				chip.title = "Tap to add to Team A";
-				chip.onclick = () => {
+				chip.setAttribute("aria-label", `Add ${name} to Team A`);
+				chip.addEventListener("click", () => {
 					if (selectedRosterA.length >= maxA) {
 						showError(
 							`Team A is full (${maxA} players). Increase player count to add more.`,
@@ -569,16 +549,17 @@ function renderRosterChips() {
 					}
 					selectedRosterA.push(name);
 					renderRosterChips();
-				};
+				});
 				poolA.append(chip);
 			});
 		}
 		if (isAdmin) {
-			const addChip = document.createElement("span");
+			const addChip = document.createElement("button");
+			addChip.type = "button";
 			addChip.className = "pool-chip add-new-pill";
 			addChip.textContent = "＋ New Player";
 			addChip.title = "Register a new player in directory";
-			addChip.onclick = async () => {
+			addChip.addEventListener("click", async () => {
 				const newName = await showAddPlayerModal(poolSearchA.trim());
 				if (
 					newName &&
@@ -588,7 +569,7 @@ function renderRosterChips() {
 					selectedRosterA.push(newName);
 					renderRosterChips();
 				}
-			};
+			});
 			poolA.append(addChip);
 		}
 	}
@@ -615,6 +596,7 @@ function renderRosterChips() {
 				btn.className = "sel-chip-remove";
 				btn.innerHTML = "&times;";
 				btn.title = "Remove from Team B";
+				btn.setAttribute("aria-label", `Remove ${name} from Team B`);
 				btn.onclick = () => {
 					selectedRosterB.splice(idx, 1);
 					renderRosterChips();
@@ -640,15 +622,19 @@ function renderRosterChips() {
 			hint.style.fontSize = "11px";
 			hint.textContent = qB
 				? "No matching players in directory."
-				: "All directory players selected.";
+				: commonPlayers.length
+					? "No available directory players."
+					: "Player directory is empty.";
 			poolB.append(hint);
 		} else {
 			listB.forEach((name) => {
-				const chip = document.createElement("span");
+				const chip = document.createElement("button");
+				chip.type = "button";
 				chip.className = "pool-chip";
 				chip.textContent = name;
 				chip.title = "Tap to add to Team B";
-				chip.onclick = () => {
+				chip.setAttribute("aria-label", `Add ${name} to Team B`);
+				chip.addEventListener("click", () => {
 					if (selectedRosterB.length >= maxB) {
 						showError(
 							`Team B is full (${maxB} players). Increase player count to add more.`,
@@ -657,22 +643,23 @@ function renderRosterChips() {
 					}
 					selectedRosterB.push(name);
 					renderRosterChips();
-				};
+				});
 				poolB.append(chip);
 			});
 		}
 		if (isAdmin) {
-			const addChip = document.createElement("span");
+			const addChip = document.createElement("button");
+			addChip.type = "button";
 			addChip.className = "pool-chip add-new-pill";
 			addChip.textContent = "＋ New Player";
 			addChip.title = "Register a new player in directory";
-			addChip.onclick = async () => {
+			addChip.addEventListener("click", async () => {
 				const newName = await showAddPlayerModal(poolSearchB.trim());
 				if (newName && selectedRosterB.length < maxB && !selectedRosterB.includes(newName)) {
 					selectedRosterB.push(newName);
 					renderRosterChips();
 				}
-			};
+			});
 			poolB.append(addChip);
 		}
 	}
@@ -688,7 +675,7 @@ async function handleAddChipInput(side) {
 	const other = side === "A" ? selectedRosterB : selectedRosterA;
 
 	const existingMatch = commonPlayers.find((p) => p.toLowerCase() === name.toLowerCase());
-	const finalName = formatPlayerName(existingMatch || name);
+	let finalName = formatPlayerName(existingMatch || name);
 
 	if (current.some((p) => p.toLowerCase() === finalName.toLowerCase())) {
 		showError(`${finalName} is already in Team ${side}.`);
@@ -703,18 +690,14 @@ async function handleAddChipInput(side) {
 		return;
 	}
 
+	if (!existingMatch) {
+		finalName = await showAddPlayerModal(name);
+		if (!finalName) return;
+	}
 	current.push(finalName);
 	inp.value = "";
 	if (side === "A") poolSearchA = "";
 	else poolSearchB = "";
-
-	if (!existingMatch) {
-		commonPlayers.push(finalName);
-		commonPlayers.sort((a, b) => a.localeCompare(b));
-		try {
-			await api("player_create", "POST", { name: finalName });
-		} catch (e) {}
-	}
 
 	renderRosterChips();
 }
@@ -1510,6 +1493,23 @@ $("playersA").addEventListener("input", () => {
 $("playersB").addEventListener("input", () => {
 	renderRosterChips();
 });
+[
+	{ side: "A", searchId: "playerSearchA", addId: "addPlayerToRosterA", autoId: "autoFillA" },
+	{ side: "B", searchId: "playerSearchB", addId: "addPlayerToRosterB", autoId: "autoFillB" },
+].forEach(({ side, searchId, addId, autoId }) => {
+	$(searchId).addEventListener("input", (event) => {
+		if (side === "A") poolSearchA = event.target.value;
+		else poolSearchB = event.target.value;
+		renderRosterChips();
+	});
+	$(searchId).addEventListener("keydown", (event) => {
+		if (event.key !== "Enter") return;
+		event.preventDefault();
+		handleAddChipInput(side);
+	});
+	$(addId).addEventListener("click", () => handleAddChipInput(side));
+	$(autoId).addEventListener("click", () => autoFillRoster(side));
+});
 $("newMatch").onclick = async () => {
 	if (!isAdmin) return;
 	stopPoll();
@@ -1538,6 +1538,7 @@ function syncTossPills() {
 	const b = ($("teamB").value.trim() || "Team B").toUpperCase();
 	$("pillA").textContent = a;
 	$("pillB").textContent = b;
+	renderRosterChips();
 }
 $("teamA").addEventListener("input", syncTossPills);
 $("teamB").addEventListener("input", syncTossPills);
@@ -4646,6 +4647,14 @@ window.addEventListener("popstate", async (event) => {
 			setPendingExtra("");
 			show("app");
 			loadPlayerStats();
+			break;
+		case "toss":
+			mainTab = "toss";
+			stopPoll();
+			current = null;
+			editingMatch = false;
+			setPendingExtra("");
+			show("app");
 			break;
 		case "login":
 			stopPoll();

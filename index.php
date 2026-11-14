@@ -94,39 +94,35 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
 
       <div id="mainTabs" class="home-tabs main-tabs hidden" role="tablist" aria-label="Scoreboard sections">
         <button id="matchesMainTab" class="home-tab" type="button" role="tab" aria-selected="true" aria-controls="matchesView" tabindex="0">Matches</button>
-        <button id="statsMainTab" class="home-tab" type="button" role="tab" aria-selected="false" aria-controls="statsView" tabindex="-1">Player statistics</button>
+        <button id="statsMainTab" class="home-tab" type="button" role="tab" aria-selected="false" aria-controls="statsView" tabindex="-1">Players</button>
+        <button id="tossMainTab" class="home-tab" type="button" role="tab" aria-selected="false" aria-controls="tossView" tabindex="-1">Toss</button>
       </div>
 
-      <div id="matchesView" role="tabpanel" aria-labelledby="matchesMainTab" tabindex="0">
-        <div class="home-tabs" role="tablist" aria-label="Home">
-          <button id="savedMatchesTab" class="home-tab" type="button" role="tab" aria-selected="true" aria-controls="savedMatchesPanel" tabindex="0">Saved matches</button>
-          <button id="tossTab" class="home-tab" type="button" role="tab" aria-selected="false" aria-controls="tossPanel" tabindex="-1">Toss</button>
-        </div>
-        <section id="savedMatchesPanel" class="panel home-tabpanel" role="tabpanel" aria-labelledby="savedMatchesTab" tabindex="0">
-          <h2>Saved matches</h2>
-          <div id="matchList" class="match-list"></div>
-        </section>
-        <section id="tossPanel" class="panel home-tabpanel" role="tabpanel" aria-labelledby="tossTab" tabindex="0" hidden>
-          <section class="coin-toss" aria-labelledby="coinTossTitle" aria-busy="false">
-            <div class="coin-toss-copy">
-              <p class="coin-toss-eyebrow">QUICK DECIDER <span>·</span> 50 / 50</p>
-              <h3 id="coinTossTitle">Leave it to chance.</h3>
-              <p class="coin-toss-description">One quick flip to settle heads or tails.</p>
-              <p id="coinTossResult" class="coin-toss-result" role="status" aria-live="polite" aria-atomic="true">Ready when you are.</p>
+      <section id="matchesView" class="panel" role="tabpanel" aria-labelledby="matchesMainTab" tabindex="0">
+        <h2>Saved matches</h2>
+        <div id="matchList" class="match-list"></div>
+      </section>
+
+      <section id="tossView" class="panel hidden" role="tabpanel" aria-labelledby="tossMainTab" tabindex="0">
+        <section class="coin-toss" aria-labelledby="coinTossTitle" aria-busy="false">
+          <div class="coin-toss-copy">
+            <p class="coin-toss-eyebrow">QUICK DECIDER <span>·</span> 50 / 50</p>
+            <h3 id="coinTossTitle">Leave it to chance.</h3>
+            <p class="coin-toss-description">One quick flip to settle heads or tails.</p>
+            <p id="coinTossResult" class="coin-toss-result" role="status" aria-live="polite" aria-atomic="true">Ready when you are.</p>
+          </div>
+          <div class="coin-toss-action">
+            <div class="coin-stage" aria-hidden="true">
+              <span class="coin-stage-caption">HEADS OR TAILS</span>
+              <div class="coin" id="coin" aria-hidden="true">?</div>
             </div>
-            <div class="coin-toss-action">
-              <div class="coin-stage" aria-hidden="true">
-                <span class="coin-stage-caption">HEADS OR TAILS</span>
-                <div class="coin" id="coin" aria-hidden="true">?</div>
-              </div>
-              <button type="button" id="flipCoin" class="primary coin-flip">
-                <span class="coin-flip-icon" aria-hidden="true">↻</span>
-                <span id="flipCoinLabel">Flip coin</span>
-              </button>
-            </div>
-          </section>
+            <button type="button" id="flipCoin" class="primary coin-flip">
+              <span class="coin-flip-icon" aria-hidden="true">↻</span>
+              <span id="flipCoinLabel">Flip coin</span>
+            </button>
+          </div>
         </section>
-      </div>
+      </section>
 
       <div id="statsView" class="panel hidden" role="tabpanel" aria-labelledby="statsMainTab" tabindex="0">
         <div class="stats-header">
@@ -188,6 +184,36 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
             <label>Team B<input id="teamB" required value="BNI"></label>
             <label>Players<input id="playersB" type="number" min="2" max="15" value="7" required></label>
           </div>
+
+          <section class="roster-editor full" aria-labelledby="rosterTitleA">
+            <div class="roster-editor-head">
+              <h3 id="rosterTitleA">PAREL players</h3>
+              <span class="roster-count">Selected <strong id="countA">0</strong>/<span id="maxA">7</span></span>
+              <button type="button" class="ghost roster-autofill" id="autoFillA">Auto-fill</button>
+            </div>
+            <div id="selectedChipsA" class="selected-roster" aria-label="Selected Team A players"></div>
+            <label for="playerSearchA">Select from directory or add a player</label>
+            <div class="roster-search-row">
+              <input id="playerSearchA" type="text" autocomplete="off" placeholder="Search or type a player name">
+              <button type="button" class="ghost" id="addPlayerToRosterA">Add name</button>
+            </div>
+            <div id="poolChipsA" class="player-pool" aria-label="Available players for Team A"></div>
+          </section>
+
+          <section class="roster-editor full" aria-labelledby="rosterTitleB">
+            <div class="roster-editor-head">
+              <h3 id="rosterTitleB">BNI players</h3>
+              <span class="roster-count">Selected <strong id="countB">0</strong>/<span id="maxB">7</span></span>
+              <button type="button" class="ghost roster-autofill" id="autoFillB">Auto-fill</button>
+            </div>
+            <div id="selectedChipsB" class="selected-roster" aria-label="Selected Team B players"></div>
+            <label for="playerSearchB">Select from directory or add a player</label>
+            <div class="roster-search-row">
+              <input id="playerSearchB" type="text" autocomplete="off" placeholder="Search or type a player name">
+              <button type="button" class="ghost" id="addPlayerToRosterB">Add name</button>
+            </div>
+            <div id="poolChipsB" class="player-pool" aria-label="Available players for Team B"></div>
+          </section>
 
           <label>Overs per innings<input id="overs" type="number" min="1" max="50" value="6" required></label>
 

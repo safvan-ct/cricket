@@ -18,5 +18,6 @@
 			build: (id) => `/matches/${encodeURIComponent(id)}`,
 		},
 		{ name: "stats", path: "/stats", match: /^\/stats\/?$/ },
+		{ name: "toss", path: "/toss", match: /^\/toss\/?$/ },
 	];
 })(window);
