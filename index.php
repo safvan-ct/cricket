@@ -130,7 +130,7 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
       </div>
 
       <div id="scoreView" class="hidden">
-        <div class="section-head"><button id="back" class="ghost">← Matches</button>
+        <div class="section-head"><button id="back" class="ghost" style="padding: 5px;">← Matches</button>
           <span id="matchTitle" class="eyebrow"></span>
         </div>
         <div class="score-hero">

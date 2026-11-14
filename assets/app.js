@@ -1,6 +1,7 @@
 const $ = (id) => document.getElementById(id);
 let current = null;
 let state = null;
+let matchSeriesScore = null;
 let pendingExtra = "";
 let pendingWicket = false;
 let isAdmin = false;
@@ -78,10 +79,16 @@ function startViewerPoll() {
 			const prev = state;
 			const r = await api("get", "GET", null, current);
 			const closed = overJustClosed(prev, r.state);
+			const matchCompleted =
+				prev &&
+				prev.status !== "complete" &&
+				r.state &&
+				r.state.status === "complete";
 			const inningsChanged =
 				prev && prev.innings === 1 && r.state && r.state.innings === 2;
 			state = r.state;
 			render();
+			if (matchCompleted) refreshMatchSeriesScore(current);
 			if (inningsChanged) {
 				const beforeLegal = legalCount(prev);
 				const afterLegal = r.state.innings_1 ? r.state.innings_1.legal : 0;
@@ -305,13 +312,14 @@ $("setupForm").onsubmit = async (e) => {
 		if (editingMatch && current) {
 			const r = await api("update", "POST", body, current);
 			state = r.state;
-			$("matchTitle").textContent = matchTitleText(state);
+			matchSeriesScore = null;
 			editingMatch = false;
 			setRoute("score", current, "replace");
 			$("setupView").classList.add("hidden");
 			$("scoreView").classList.remove("hidden");
 			headerMode();
 			render();
+			refreshMatchSeriesScore(current);
 			startViewerPoll();
 		} else {
 			const r = await api("create", "POST", body);
@@ -391,6 +399,29 @@ function seriesSummary(matches) {
 		result: teams[winnerIndex].name + " won series · " + score,
 		complete: true,
 	};
+}
+function seriesScoreForMatch(matches, matchId, currentState) {
+	const savedMatch = matches.find((match) => String(match.id) === String(matchId));
+	const matchDay = matchDayKey(savedMatch || { state: currentState });
+	const currentSeriesKey = matchSeriesKey({ state: currentState });
+	const teamA = seriesTeamKey(currentState.team_a);
+	const teamB = seriesTeamKey(currentState.team_b);
+	const wins = [0, 0];
+
+	matches.forEach((match) => {
+		const matchState = match.state || {};
+		if (
+			matchDayKey(match) !== matchDay ||
+			matchSeriesKey(match) !== currentSeriesKey ||
+			matchState.status !== "complete"
+		)
+			return;
+		const winner = seriesTeamKey(matchState.result && matchState.result.winner);
+		if (winner && winner === teamA) wins[0]++;
+		else if (winner && winner === teamB) wins[1]++;
+	});
+
+	return wins.join("-");
 }
 function cardInnings(deliveries) {
 	let total = 0,
@@ -566,6 +597,20 @@ async function loadMatches() {
 		showError(e.message);
 	}
 }
+async function refreshMatchSeriesScore(matchId = current) {
+	if (!matchId || !state) return;
+	try {
+		const r = await api("list");
+		if (String(current) !== String(matchId) || !state) return;
+		matchSeriesScore = seriesScoreForMatch(r.matches, matchId, state);
+		$("matchTitle").textContent = matchTitleText(state);
+	} catch (error) {
+		if (String(current) !== String(matchId) || !state) return;
+		matchSeriesScore = null;
+		$("matchTitle").textContent = matchTitleText(state);
+		await showError(error.message);
+	}
+}
 function esc(s) {
 	return String(s).replace(
 		/[&<>"']/g,
@@ -579,6 +624,7 @@ async function openMatch(id, historyMode = "push") {
 	const r = await api("get", "GET", null, id);
 	current = id;
 	state = r.state;
+	matchSeriesScore = null;
 	editingMatch = false;
 	setPendingExtra("");
 	Object.keys(overSectionOpen).forEach((k) => delete overSectionOpen[k]);
@@ -593,6 +639,7 @@ async function openMatch(id, historyMode = "push") {
 	fillPlayers();
 	render();
 	startViewerPoll();
+	refreshMatchSeriesScore(id);
 	if (historyMode) rememberMatch(id, historyMode);
 }
 function fillPlayers() {
@@ -628,7 +675,7 @@ function battingTeamName() {
 function matchTitleText(s) {
 	const a = s.players_a || s.players || 7;
 	const b = s.players_b || s.players || 7;
-	return (
+	const title = (
 		(s.team_a || "") +
 		" (" +
 		a +
@@ -640,6 +687,7 @@ function matchTitleText(s) {
 		(s.overs_limit || 0) +
 		")"
 	);
+	return title + (matchSeriesScore === null ? "" : " (" + matchSeriesScore + ")");
 }
 function isComplete() {
 	return state.status === "complete";
