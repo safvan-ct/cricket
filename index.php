@@ -191,6 +191,36 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
       </div>
       <div id="modalBalls" class="modal-balls hidden"></div>
       <div id="modalFields" class="modal-fields hidden">
+        <div class="modal-extra-type">
+          <span>Delivery type</span>
+          <div id="modalExtraTypePills" class="modal-type-pills" role="radiogroup" aria-label="Delivery type">
+            <label class="modal-type-pill">
+              <input type="radio" name="modalExtraTypePill" value="" aria-label="Normal delivery">
+              <span>Normal</span>
+            </label>
+            <label class="modal-type-pill">
+              <input type="radio" name="modalExtraTypePill" value="wide" aria-label="Wide">
+              <span>Wide</span>
+            </label>
+            <label class="modal-type-pill">
+              <input type="radio" name="modalExtraTypePill" value="no-ball" aria-label="No-ball">
+              <span>No-ball</span>
+            </label>
+            <label class="modal-type-pill">
+              <input type="radio" name="modalExtraTypePill" value="overthrow" aria-label="Overthrow (OT)">
+              <span title="Overthrow">OT 4</span>
+            </label>
+          </div>
+          <select id="modalExtraType" class="hidden" aria-hidden="true" tabindex="-1">
+            <option value="">Normal delivery</option>
+            <option value="wide">Wide</option>
+            <option value="no-ball">No-ball</option>
+            <option value="overthrow">Overthrow</option>
+            <option value="bye">Bye</option>
+            <option value="leg-bye">Leg-bye</option>
+            <option value="penalty">Penalty</option>
+          </select>
+        </div>
         <p id="modalAddonLabel" class="modal-addon-label">Add-on runs</p>
         <div class="modal-addon" role="radiogroup" aria-label="Add-on runs">
           <label class="modal-addon-opt addon-zero"><input type="radio" name="modalAddon" value="0" checked>0</label>

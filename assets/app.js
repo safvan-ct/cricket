@@ -778,28 +778,37 @@ function chipClass(d) {
 	else if (extra) cls += " extra";
 	return cls;
 }
-function makeChip(d) {
-	const chip = document.createElement("span");
-	chip.className = chipClass(d);
+function makeChip(d, onEdit = null) {
+	const chip = document.createElement(onEdit ? "button" : "span");
+	chip.className = chipClass(d) + (onEdit ? " editable" : "");
+	if (onEdit) {
+		chip.type = "button";
+		chip.title = "Edit delivery";
+		chip.setAttribute("aria-label", "Edit delivery: " + ballNote(d));
+		chip.onclick = onEdit;
+	}
 	chip.textContent = ballNote(d);
 	return chip;
 }
 function groupOvers(deliveries) {
 	const overs = [];
 	let balls = [];
+	let indices = [];
 	let legal = 0;
-	(deliveries || []).forEach((d) => {
+	(deliveries || []).forEach((d, index) => {
 		balls.push(d);
+		indices.push(index);
 		if (isLegalBall(d)) {
 			legal++;
 			if (legal === 6) {
-				overs.push({ balls, complete: true });
+				overs.push({ balls, indices, complete: true });
 				balls = [];
+				indices = [];
 				legal = 0;
 			}
 		}
 	});
-	if (balls.length) overs.push({ balls, complete: false });
+	if (balls.length) overs.push({ balls, indices, complete: false });
 	return overs;
 }
 function overRuns(balls) {
@@ -822,6 +831,8 @@ function appendOverSection(
 	deliveries,
 	markCurrent,
 	defaultOpen,
+	inningsNumber,
+	canEdit,
 ) {
 	const details = document.createElement("details");
 	details.className = "over-team";
@@ -856,6 +867,12 @@ function appendOverSection(
 		p.textContent = "No deliveries yet.";
 		body.append(p);
 	} else {
+		if (canEdit) {
+			const hint = document.createElement("p");
+			hint.className = "hint edit-delivery-hint";
+			hint.textContent = "Tap any ball to edit its delivery.";
+			body.append(hint);
+		}
 		for (let i = overs.length - 1; i >= 0; i--) {
 			const ov = overs[i];
 			const card = document.createElement("div");
@@ -871,7 +888,12 @@ function appendOverSection(
 			h.append(title, runs);
 			const chips = document.createElement("div");
 			chips.className = "over-card-balls";
-			ov.balls.forEach((d) => chips.append(makeChip(d)));
+			ov.balls.forEach((d, ballIndex) => {
+				const onEdit = canEdit
+					? () => editDelivery(inningsNumber, ov.indices[ballIndex], d)
+					: null;
+				chips.append(makeChip(d, onEdit));
+			});
 			card.append(h, chips);
 			body.append(card);
 		}
@@ -909,6 +931,8 @@ function renderOverCards() {
 		current,
 		!isComplete(),
 		!complete,
+		state.innings,
+		isAdmin && !state.locked && !complete,
 	);
 	if (state.innings === 2 && state.innings_1) {
 		const i1 = state.innings_1;
@@ -920,6 +944,8 @@ function renderOverCards() {
 			i1.deliveries || [],
 			false,
 			false,
+			1,
+			isAdmin && !state.locked && !complete,
 		);
 	}
 }
@@ -1283,11 +1309,156 @@ function commitExtra(type, additional, wicket) {
 function addonValue() {
 	const el = document.querySelector('input[name="modalAddon"]:checked');
 	const n = el ? parseInt(el.value, 10) : 0;
-	const max = $("modalFields").classList.contains("overthrow-mode") ? 3 : 7;
+	const type = $("modalExtraType").value;
+	const max = $("modalFields").classList.contains("overthrow-mode")
+		? 3
+		: $("modalFields").classList.contains("editing-delivery") &&
+				(type === "" || type === "no-ball")
+			? 6
+			: 7;
 	return Number.isNaN(n) ? 0 : Math.min(max, Math.max(0, n));
 }
+function deliveryValuesFromEdit(type, amount) {
+	if (type === "wide") return { runs: 0, extra_runs: 1 + amount };
+	if (type === "no-ball") return { runs: amount, extra_runs: 1 };
+	if (type === "bye" || type === "leg-bye")
+		return { runs: 0, extra_runs: Math.max(1, amount) };
+	if (type === "penalty") return { runs: 0, extra_runs: amount };
+	if (type === "overthrow") return { runs: amount, extra_runs: 4 };
+	return { runs: amount, extra_runs: 0 };
+}
+function updateEditDeliveryFields() {
+	const fields = $("modalFields");
+	const type = $("modalExtraType").value;
+	[
+		"edit-normal",
+		"edit-wide",
+		"edit-no-ball",
+		"edit-bye",
+		"edit-leg-bye",
+		"edit-penalty",
+		"edit-overthrow",
+	].forEach((name) => fields.classList.remove(name));
+	fields.classList.add("edit-" + (type || "normal"));
+	fields.classList.toggle("overthrow-mode", type === "overthrow");
+	fields.classList.toggle("penalty-mode", type === "wide" || type === "no-ball");
+	const labels = {
+		"": "Runs",
+		wide: "Additional wide runs",
+		"no-ball": "Runs off the bat",
+		bye: "Bye runs",
+		"leg-bye": "Leg-bye runs",
+		penalty: "Penalty runs",
+		overthrow: "Runs completed",
+	};
+	$("modalAddonLabel").textContent = labels[type] || "Runs";
+	const checked = document.querySelector('input[name="modalAddon"]:checked');
+	const value = checked ? parseInt(checked.value, 10) : 0;
+	const minimum = ["bye", "leg-bye", "overthrow"].includes(type) ? 1 : 0;
+	const maximum =
+		type === "overthrow" ? 3 : ["", "no-ball"].includes(type) ? 6 : 7;
+	if (value < minimum || value > maximum) {
+		const input = document.querySelector(
+			'input[name="modalAddon"][value="' + minimum + '"]',
+		);
+		if (input) input.checked = true;
+	}
+}
+function setEditDeliveryType(type) {
+	$("modalExtraType").value = type;
+	document.querySelectorAll('input[name="modalExtraTypePill"]').forEach((input) => {
+		input.checked = input.value === type;
+	});
+}
+function clearEditDeliveryFields() {
+	const fields = $("modalFields");
+	fields.classList.remove(
+		"editing-delivery",
+		"edit-normal",
+		"edit-wide",
+		"edit-no-ball",
+		"edit-bye",
+		"edit-leg-bye",
+		"edit-penalty",
+		"edit-overthrow",
+	);
+	fields.classList.remove("overthrow-mode", "penalty-mode");
+	setEditDeliveryType("");
+}
+async function editDelivery(innings, index, delivery) {
+	if (!isAdmin || !current || isComplete() || state.locked) return;
+	const fields = $("modalFields");
+	const editTypes = ["", "wide", "no-ball", "bye", "leg-bye", "penalty", "overthrow"];
+	let type = editTypes.includes(delivery.extra_type || "")
+		? delivery.extra_type || ""
+		: "";
+	setEditDeliveryType(type);
+	fields.classList.add("editing-delivery");
+	updateEditDeliveryFields();
+	$("modalWicketRow").classList.remove("hidden");
+	const pending = showModal({
+		title: "Edit delivery",
+		message: "Change this ball's runs, extras, or wicket.",
+		confirmLabel: "Save delivery",
+		showCancel: true,
+		fields: true,
+	});
+	setEditDeliveryType(type);
+	updateEditDeliveryFields();
+	const amount =
+		type === "wide"
+			? Math.max(0, (delivery.extra_runs || 1) - 1)
+			: type === "bye" || type === "leg-bye" || type === "penalty"
+				? delivery.extra_runs || 1
+				: delivery.runs || 0;
+	const amountInput = document.querySelector(
+		'input[name="modalAddon"][value="' + amount + '"]',
+	);
+	if (amountInput) amountInput.checked = true;
+	$("modalWicket").checked = !!delivery.wicket;
+	try {
+		if (!(await pending)) return;
+		type = $("modalExtraType").value;
+		const additional = addonValue();
+		const { runs, extra_runs: extraRuns } = deliveryValuesFromEdit(
+			type,
+			additional,
+		);
+		const wicket = $("modalWicket").checked;
+		const previousInnings = state.innings;
+		const updatedDelivery = {
+			...delivery,
+			runs,
+			extra_type: type,
+			extra_runs: extraRuns,
+			wicket,
+			dismissal: wicket ? delivery.dismissal || "bowled" : "",
+		};
+		const r = await api(
+			"edit_delivery",
+			"POST",
+			{ innings, index, delivery: updatedDelivery },
+			current,
+		);
+		state = r.state;
+		render();
+		if (isComplete() || state.innings !== previousInnings)
+			await notifyPhaseChange();
+		else $("actionMessage").textContent = "Delivery updated.";
+	} catch (error) {
+		await showError(error.message);
+	} finally {
+		clearEditDeliveryFields();
+	}
+}
+$("modalExtraTypePills").addEventListener("change", (event) => {
+	if (event.target.name !== "modalExtraTypePill") return;
+	$("modalExtraType").value = event.target.value;
+	updateEditDeliveryFields();
+});
 async function openDeliveryPopup(type) {
 	if (!isAdmin || !current || isComplete()) return;
+	clearEditDeliveryFields();
 	const isWicket = type === "wicket";
 	const isOvr = type === "overthrow";
 	const isPenalty = type === "wide" || type === "no-ball";
