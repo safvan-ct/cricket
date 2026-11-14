@@ -92,7 +92,12 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
         <button id="updateMatch" class="primary hidden">Update match info</button>
       </div>
 
-      <div id="matchesView">
+      <div id="mainTabs" class="home-tabs main-tabs hidden" role="tablist" aria-label="Scoreboard sections">
+        <button id="matchesMainTab" class="home-tab" type="button" role="tab" aria-selected="true" aria-controls="matchesView" tabindex="0">Matches</button>
+        <button id="statsMainTab" class="home-tab" type="button" role="tab" aria-selected="false" aria-controls="statsView" tabindex="-1">Player statistics</button>
+      </div>
+
+      <div id="matchesView" role="tabpanel" aria-labelledby="matchesMainTab" tabindex="0">
         <div class="home-tabs" role="tablist" aria-label="Home">
           <button id="savedMatchesTab" class="home-tab" type="button" role="tab" aria-selected="true" aria-controls="savedMatchesPanel" tabindex="0">Saved matches</button>
           <button id="tossTab" class="home-tab" type="button" role="tab" aria-selected="false" aria-controls="tossPanel" tabindex="-1">Toss</button>
@@ -123,15 +128,16 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
         </section>
       </div>
 
-      <div id="statsView" class="panel hidden">
+      <div id="statsView" class="panel hidden" role="tabpanel" aria-labelledby="statsMainTab" tabindex="0">
         <div class="stats-header">
           <div class="stats-title-group">
             <h2>Player Statistics</h2>
             <p class="hint" style="margin:2px 0 0">Career statistics aggregated across completed matches</p>
           </div>
-          <button type="button" id="addPlayerBtn" class="primary narrow hidden">＋ Add player</button>
+          <button type="button" id="addPlayerBtn" class="primary hidden">＋ Add player</button>
         </div>
 
+        <p id="playerStatsStatus" class="hint" role="status" aria-live="polite"></p>
         <div class="leaderboard-grid" id="leaderboardGrid"></div>
 
         <div class="player-directory-section">
@@ -154,6 +160,7 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
                   <th>Wkts</th>
                   <th>BBI</th>
                   <th>Econ</th>
+                  <th id="playerStatsActionsHeader" class="hidden">Actions</th>
                 </tr>
               </thead>
               <tbody id="playerStatsBody"></tbody>

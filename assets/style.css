@@ -691,6 +691,250 @@ td:first-child {
     text-align: left
 }
 
+.main-tabs {
+    margin-bottom: 20px
+}
+
+.stats-header,
+.player-directory-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px
+}
+
+.stats-header {
+    margin-bottom: 16px
+}
+
+.stats-header h2,
+.player-directory-head h3 {
+    margin: 0
+}
+
+#addPlayerBtn {
+    flex: 0 0 auto;
+    margin: 0
+}
+
+.leaderboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(205px, 1fr));
+    gap: 12px;
+    margin: 16px 0 28px
+}
+
+.leaderboard-card {
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: linear-gradient(145deg, #fff, #f8fbff)
+}
+
+.leaderboard-card h3 {
+    margin: 0 0 12px;
+    color: var(--blue);
+    font-size: 13px
+}
+
+.leaderboard-list {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none
+}
+
+.leaderboard-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+    font-size: 12px
+}
+
+.leaderboard-player,
+.player-profile-link {
+    min-width: 0;
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--blue);
+    font: inherit;
+    font-weight: 700;
+    text-align: left
+}
+
+.leaderboard-player {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap
+}
+
+.leaderboard-player:hover,
+.player-profile-link:hover {
+    text-decoration: underline
+}
+
+.leaderboard-metric {
+    flex: 0 0 auto;
+    color: #355674;
+    font-weight: 700
+}
+
+.leaderboard-empty,
+.player-stats-empty {
+    margin: 0;
+    color: var(--muted);
+    font-size: 12px
+}
+
+.player-directory-section {
+    border-top: 1px solid var(--line);
+    padding-top: 22px
+}
+
+.player-directory-head {
+    margin-bottom: 12px
+}
+
+.player-directory-head h3 {
+    color: var(--ink);
+    font-size: 16px
+}
+
+.search-filter-box {
+    width: min(100%, 300px)
+}
+
+.stats-search-input {
+    padding: 9px 11px
+}
+
+.player-stats-table {
+    min-width: 760px
+}
+
+.player-stats-table th {
+    text-align: right
+}
+
+.player-stats-table th:first-child,
+.player-stats-table td:first-child {
+    text-align: left
+}
+
+.player-name-cell {
+    min-width: 140px
+}
+
+.player-status {
+    display: inline-block;
+    margin-left: 7px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: #edf1f5;
+    color: #66788a;
+    font-size: 9px;
+    font-weight: 700;
+    vertical-align: middle
+}
+
+.player-actions-cell {
+    min-width: 205px;
+    white-space: normal
+}
+
+.player-actions-cell .player-action {
+    margin: 2px;
+    padding: 7px 9px;
+    font-size: 11px
+}
+
+.player-actions-cell .ghost {
+    margin-bottom: 2px
+}
+
+.player-action:disabled {
+    cursor: not-allowed;
+    opacity: .5
+}
+
+.pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-height: 38px;
+    color: var(--muted);
+    font-size: 12px
+}
+
+.pagination-bar .player-action {
+    margin: 0;
+    padding: 7px 11px
+}
+
+.player-profile-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(115px, 1fr));
+    gap: 8px
+}
+
+.player-profile-summary > div {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 11px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: #f7faff
+}
+
+.player-profile-summary span {
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700
+}
+
+.player-profile-summary strong {
+    color: var(--blue);
+    font-size: 17px
+}
+
+.player-profile-log-title {
+    margin: 22px 0 10px;
+    font-size: 14px
+}
+
+.player-match-log {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none
+}
+
+.player-match-log li {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    font-size: 12px
+}
+
+.player-match-log li strong {
+    color: var(--blue)
+}
+
+.player-match-log li span {
+    color: var(--muted)
+}
+
 /* Ball chips */
 .recent {
     display: flex;
@@ -817,6 +1061,21 @@ td:first-child {
     .home-tab {
         min-width: 0;
         padding: 10px 8px
+    }
+
+    .stats-header,
+    .player-directory-head {
+        align-items: stretch;
+        flex-direction: column
+    }
+
+    .search-filter-box {
+        width: 100%
+    }
+
+    .pagination-bar {
+        gap: 7px;
+        font-size: 11px
     }
 
     .topline h1 {

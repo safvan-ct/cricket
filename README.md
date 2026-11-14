@@ -23,7 +23,7 @@ This version is designed for Hostinger Premium Web Hosting. It uses PHP (PDO) an
 ## 4. Open the app
 Visit `https://your-domain.com/` (or the subdirectory where you uploaded it). Sign in with the admin password configured in `config.php`.
 
-The app uses direct routes for `/matches`, `/matches/new`, `/matches/{id}`, `/matches/{id}/edit`, and `/login`. Apache's included `.htaccess` rewrites these routes to the app shell; older `#m={id}` match links are still supported. Frontend route definitions, navigation, and application code are organized under `assets/js/`.
+The app uses direct routes for `/matches`, `/matches/new`, `/matches/{id}`, `/matches/{id}/edit`, `/stats`, and `/login`. Apache's included `.htaccess` rewrites these routes to the app shell; older `#m={id}` match links are still supported. The `/stats` route provides player leaderboards, searchable career statistics, player profiles, and admin directory management. Frontend route definitions, navigation, and application code are organized under `assets/js/`.
 
 The API is available under `/api/`: auth uses `/status`, `/login`, and `/logout`; matches use `/matches` and `/matches/{id}`; players use `/players` and `/players/{id}`; scoring actions use `/matches/{id}/{action}`. Legacy `api/index.php?action=...` requests remain supported. Every API response uses `{ "success": true, "data": ... }` or `{ "success": false, "error": { "code": "...", "message": "..." } }`.
 

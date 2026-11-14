@@ -81,6 +81,8 @@ function show(id) {
 			$("statsView").classList.add("hidden");
 		}
 	}
+	syncMainTabButtons();
+	headerMode();
 }
 function setHomeTab(tabId) {
 	const tabs = [$("savedMatchesTab"), $("tossTab")];
@@ -107,6 +109,49 @@ function setHomeTab(tabId) {
 		setHomeTab(tabs[nextIndex].id);
 	});
 });
+function syncMainTabButtons() {
+	const matchesTab = $("matchesMainTab");
+	const statsTab = $("statsMainTab");
+	if (!matchesTab || !statsTab) return;
+	[
+		[matchesTab, "matches"],
+		[statsTab, "stats"],
+	].forEach(([tab, name]) => {
+		const active = mainTab === name;
+		tab.setAttribute("aria-selected", String(active));
+		tab.tabIndex = active ? 0 : -1;
+	});
+}
+function setMainTab(tabName, historyMode = "push") {
+	if (!["matches", "stats"].includes(tabName)) return;
+	const changed = mainTab !== tabName;
+	mainTab = tabName;
+	if (changed || historyMode === "replace") setRoute(tabName, null, historyMode);
+	show("app");
+	syncMainTabButtons();
+	if (tabName === "stats") loadPlayerStats();
+	else loadMatches();
+}
+[
+	[$("matchesMainTab"), "matches"],
+	[$("statsMainTab"), "stats"],
+].forEach(([tab, name]) => {
+	tab.addEventListener("click", () => setMainTab(name));
+	tab.addEventListener("keydown", (event) => {
+		if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+		event.preventDefault();
+		const currentIndex = name === "matches" ? 0 : 1;
+		const nextIndex =
+			event.key === "Home"
+				? 0
+				: event.key === "End"
+					? 1
+					: (currentIndex + (event.key === "ArrowRight" ? 1 : -1) + 2) % 2;
+		const nextName = nextIndex === 0 ? "matches" : "stats";
+		$(nextName === "stats" ? "statsMainTab" : "matchesMainTab").focus();
+		setMainTab(nextName);
+	});
+});
 function setRoute(screen, matchId = null, mode = "push") {
 	window.CricketRouter.navigate(screen, matchId, mode);
 }
@@ -114,6 +159,7 @@ function rememberMatch(id, mode = "push") {
 	setRoute("score", id, mode);
 }
 function forgetMatch() {
+	mainTab = "matches";
 	setRoute("matches", null, "replace");
 }
 function pushNavState(stateUpdate = {}, hash = "", replace = false) {
@@ -199,9 +245,10 @@ function headerMode() {
 	$("updateMatch").classList.toggle("hidden", !inProgress);
 	const matchOpen = !$("scoreView").classList.contains("hidden");
 	const setupOpen = !$("setupView").classList.contains("hidden");
+	const appOpen = !$("app").classList.contains("hidden");
 	const mainTabs = $("mainTabs");
 	if (mainTabs) {
-		mainTabs.classList.toggle("hidden", matchOpen || setupOpen);
+		mainTabs.classList.toggle("hidden", !appOpen || matchOpen || setupOpen);
 	}
 }
 function applyRole() {
@@ -273,6 +320,12 @@ async function boot() {
 				}
 			}
 			break;
+		case "stats":
+			mainTab = "stats";
+			setRoute("stats", null, "replace");
+			show("app");
+			loadPlayerStats();
+			return;
 	}
 	mainTab = "matches";
 	setRoute("matches", null, "replace");
@@ -721,6 +774,362 @@ async function showAddPlayerModal(initialName = "") {
 		return null;
 	}
 }
+
+const playerStatsPageSize = 20;
+let playerStatsPage = 1;
+function statNumber(value, digits = 2) {
+	if (value === null || value === undefined || value === "") return "—";
+	const number = Number(value);
+	return Number.isFinite(number) ? number.toFixed(digits).replace(/\.?0+$/, "") : "—";
+}
+function statText(value, fallback = "—") {
+	return value === null || value === undefined || value === "" ? fallback : String(value);
+}
+function renderLeaderboards(leaderboards = {}) {
+	const root = $("leaderboardGrid");
+	root.replaceChildren();
+	const boards = [
+		{ key: "top_runs", title: "Most runs", metric: (p) => `${p.batting.runs} runs` },
+		{ key: "top_wickets", title: "Most wickets", metric: (p) => `${p.bowling.wickets} wickets` },
+		{ key: "top_sixes", title: "Most sixes", metric: (p) => `${p.batting.sixes} sixes` },
+		{ key: "best_economy", title: "Best economy", metric: (p) => `${statNumber(p.bowling.economy)} econ` },
+	];
+	boards.forEach((board) => {
+		const card = document.createElement("section");
+		card.className = "leaderboard-card";
+		const heading = document.createElement("h3");
+		heading.textContent = board.title;
+		card.append(heading);
+		const entries = Array.isArray(leaderboards[board.key])
+			? leaderboards[board.key].slice(0, 5)
+			: [];
+		if (!entries.length) {
+			const empty = document.createElement("p");
+			empty.className = "leaderboard-empty";
+			empty.textContent = "No results yet";
+			card.append(empty);
+		} else {
+			const list = document.createElement("ol");
+			list.className = "leaderboard-list";
+			entries.forEach((player) => {
+				const item = document.createElement("li");
+				const name = document.createElement("button");
+				name.type = "button";
+				name.className = "leaderboard-player";
+				name.textContent = statText(player.name);
+				name.addEventListener("click", () => showPlayerProfile(player));
+				const metric = document.createElement("span");
+				metric.className = "leaderboard-metric";
+				metric.textContent = board.metric(player);
+				item.append(name, metric);
+				list.append(item);
+			});
+			card.append(list);
+		}
+		root.append(card);
+	});
+}
+function renderPlayerStatsTable() {
+	const body = $("playerStatsBody");
+	const pagination = $("playerStatsPagination");
+	const allPlayers = playerStatsData && Array.isArray(playerStatsData.stats)
+		? playerStatsData.stats
+		: [];
+	const query = playerStatsFilter.trim().toLowerCase();
+	const players = allPlayers
+		.filter((player) => !query || player.name.toLowerCase().includes(query))
+		.sort((a, b) => a.name.localeCompare(b.name));
+	const totalPages = Math.max(1, Math.ceil(players.length / playerStatsPageSize));
+	playerStatsPage = Math.min(playerStatsPage, totalPages);
+	const start = (playerStatsPage - 1) * playerStatsPageSize;
+	const page = players.slice(start, start + playerStatsPageSize);
+	body.replaceChildren();
+	$("playerStatsActionsHeader").classList.toggle("hidden", !isAdmin);
+	if (!page.length) {
+		const row = document.createElement("tr");
+		const cell = document.createElement("td");
+		cell.colSpan = isAdmin ? 10 : 9;
+		cell.className = "player-stats-empty";
+		cell.textContent = query ? "No players match your search." : "No players in the directory yet.";
+		row.append(cell);
+		body.append(row);
+	} else {
+		page.forEach((player) => {
+			const row = document.createElement("tr");
+			const nameCell = document.createElement("td");
+			nameCell.className = "player-name-cell";
+			const profileButton = document.createElement("button");
+			profileButton.type = "button";
+			profileButton.className = "player-profile-link";
+			profileButton.textContent = player.name;
+			profileButton.addEventListener("click", () => showPlayerProfile(player));
+			nameCell.append(profileButton);
+			if (Number(player.is_active) === 0) {
+				const inactive = document.createElement("span");
+				inactive.className = "player-status inactive";
+				inactive.textContent = "Inactive";
+				nameCell.append(inactive);
+			}
+			row.append(nameCell);
+			[
+				player.matches,
+				player.batting.runs,
+				player.batting.hs_display,
+				statNumber(player.batting.average),
+				statNumber(player.batting.strike_rate),
+				player.bowling.wickets,
+				player.bowling.best_bowling,
+				statNumber(player.bowling.economy),
+			].forEach((value) => {
+				const cell = document.createElement("td");
+				cell.textContent = statText(value);
+				row.append(cell);
+			});
+			if (isAdmin) {
+				const actions = document.createElement("td");
+				actions.className = "player-actions-cell";
+				if (Number(player.id) > 0) {
+					actions.append(
+						playerActionButton("Edit", "ghost", () => editDirectoryPlayer(player)),
+						playerActionButton(
+							Number(player.is_active) === 0 ? "Activate" : "Deactivate",
+							"ghost",
+							() => toggleDirectoryPlayer(player),
+						),
+						playerActionButton("Delete", "danger", () => deleteDirectoryPlayer(player)),
+					);
+				} else {
+					actions.append(
+						playerActionButton("Add to directory", "ghost", () => addStatsPlayer(player)),
+					);
+				}
+				row.append(actions);
+			}
+			body.append(row);
+		});
+	}
+	pagination.replaceChildren();
+	if (players.length > playerStatsPageSize) {
+		const previous = playerActionButton("Previous", "ghost", () => {
+			playerStatsPage--;
+			renderPlayerStatsTable();
+		});
+		previous.disabled = playerStatsPage <= 1;
+		const next = playerActionButton("Next", "ghost", () => {
+			playerStatsPage++;
+			renderPlayerStatsTable();
+		});
+		next.disabled = playerStatsPage >= totalPages;
+		const pageLabel = document.createElement("span");
+		pageLabel.textContent = `Showing ${start + 1}-${Math.min(start + page.length, players.length)} of ${players.length} players`;
+		pagination.append(previous, pageLabel, next);
+	} else if (players.length) {
+		const pageLabel = document.createElement("span");
+		pageLabel.textContent = `Showing ${players.length} player${players.length === 1 ? "" : "s"}`;
+		pagination.append(pageLabel);
+	}
+}
+function playerActionButton(label, className, action) {
+	const button = document.createElement("button");
+	button.type = "button";
+	button.className = `player-action ${className}`;
+	button.textContent = label;
+	button.addEventListener("click", action);
+	return button;
+}
+async function loadPlayerStats() {
+	const status = $("playerStatsStatus");
+	status.textContent = "Loading player statistics...";
+	try {
+		const result = await api("player_stats");
+		if (!result || !Array.isArray(result.stats)) {
+			throw new Error("The player statistics response is invalid.");
+		}
+		playerStatsData = result;
+		playerStatsPage = 1;
+		renderLeaderboards(result.leaderboards || {});
+		renderPlayerStatsTable();
+		status.textContent = result.stats.length
+			? "Career statistics include completed matches only."
+			: "No player statistics are available yet.";
+	} catch (error) {
+		playerStatsData = null;
+		status.textContent = "Player statistics could not be loaded.";
+		$("leaderboardGrid").replaceChildren();
+		$("playerStatsBody").replaceChildren();
+		$("playerStatsPagination").replaceChildren();
+		const row = document.createElement("tr");
+		const cell = document.createElement("td");
+		cell.colSpan = isAdmin ? 10 : 9;
+		cell.className = "player-stats-empty";
+		cell.textContent = "Unable to display player statistics.";
+		row.append(cell);
+		$("playerStatsBody").append(row);
+		showError(error.message);
+	}
+}
+function showPlayerProfile(player) {
+	const customContent = (container) => {
+		const summary = document.createElement("div");
+		summary.className = "player-profile-summary";
+		const metrics = [
+			["Matches", player.matches],
+			["Runs", player.batting.runs],
+			["High score", player.batting.hs_display],
+			["Batting average", statNumber(player.batting.average)],
+			["Strike rate", statNumber(player.batting.strike_rate)],
+			["50s / 100s", `${player.batting.fifties} / ${player.batting.hundreds}`],
+			["Wickets", player.bowling.wickets],
+			["Best bowling", player.bowling.best_bowling],
+			["Economy", statNumber(player.bowling.economy)],
+		];
+		metrics.forEach(([label, value]) => {
+			const item = document.createElement("div");
+			const heading = document.createElement("span");
+			heading.textContent = label;
+			const number = document.createElement("strong");
+			number.textContent = statText(value);
+			item.append(heading, number);
+			summary.append(item);
+		});
+		container.append(summary);
+		const log = [...(player.match_log || [])]
+			.sort((a, b) => String(b.date).localeCompare(String(a.date)))
+			.slice(0, 10);
+		const logHeading = document.createElement("h3");
+		logHeading.className = "player-profile-log-title";
+		logHeading.textContent = "Recent match performances";
+		container.append(logHeading);
+		if (!log.length) {
+			const empty = document.createElement("p");
+			empty.className = "hint";
+			empty.textContent = "No completed-match performances yet.";
+			container.append(empty);
+			return;
+		}
+		const list = document.createElement("ul");
+		list.className = "player-match-log";
+		log.forEach((entry) => {
+			const item = document.createElement("li");
+			const title = document.createElement("strong");
+			title.textContent = statText(entry.title, "Match");
+			const details = document.createElement("span");
+			details.textContent = entry.type === "batting"
+				? `Batting · ${entry.runs} runs from ${entry.balls} balls${entry.is_out ? "" : " not out"}`
+				: `Bowling · ${entry.wickets} wickets, ${entry.runs_conceded} runs in ${entry.overs} overs (econ ${statNumber(entry.econ)})`;
+			item.append(title, details);
+			list.append(item);
+		});
+		container.append(list);
+	};
+	showModal({
+		title: player.name,
+		message: "Career totals and performances from completed matches.",
+		confirmLabel: "Close",
+		showCancel: false,
+		customContent,
+	});
+}
+async function addStatsPlayer(player) {
+	const name = await showAddPlayerModal(player.name);
+	if (name) {
+		await loadCommonPlayers();
+		await loadPlayerStats();
+	}
+}
+async function editDirectoryPlayer(player) {
+	let input;
+	const warning = document.createElement("p");
+	warning.className = "hint hidden";
+	warning.setAttribute("role", "alert");
+	const customContent = (container) => {
+		const label = document.createElement("label");
+		label.textContent = "Player name";
+		input = document.createElement("input");
+		input.type = "text";
+		input.maxLength = 100;
+		input.value = player.name;
+		label.append(input);
+		container.append(warning, label);
+	};
+	const ok = await showModal({
+		title: "Edit player",
+		message: "Update the player's directory name.",
+		confirmLabel: "Save changes",
+		showCancel: true,
+		customContent,
+		validate: () => {
+			const name = formatPlayerName(input.value);
+			if (!name) {
+				warning.textContent = "Enter a player name.";
+				warning.classList.remove("hidden");
+				return false;
+			}
+			const duplicate = (playerStatsData.stats || []).some(
+				(existing) =>
+					Number(existing.id) !== Number(player.id) &&
+					existing.name.toLowerCase() === name.toLowerCase(),
+			);
+			if (duplicate) {
+				warning.textContent = "That player name is already in the directory.";
+				warning.classList.remove("hidden");
+				return false;
+			}
+			return true;
+		},
+	});
+	if (!ok) return;
+	try {
+		await api("player_update", "POST", {
+			id: player.id,
+			name: formatPlayerName(input.value),
+		});
+		await loadCommonPlayers();
+		await loadPlayerStats();
+	} catch (error) {
+		showError(error.message);
+	}
+}
+async function toggleDirectoryPlayer(player) {
+	try {
+		await api("player_toggle_active", "POST", {
+			id: player.id,
+			is_active: Number(player.is_active) === 0,
+		});
+		await loadCommonPlayers();
+		await loadPlayerStats();
+	} catch (error) {
+		showError(error.message);
+	}
+}
+async function deleteDirectoryPlayer(player) {
+	const ok = await showModal({
+		title: "Delete player",
+		message: `Delete ${player.name} from the player directory?`,
+		confirmLabel: "Delete player",
+		showCancel: true,
+	});
+	if (!ok) return;
+	try {
+		await api("player_delete", "POST", { id: player.id });
+		await loadCommonPlayers();
+		await loadPlayerStats();
+	} catch (error) {
+		showError(error.message);
+	}
+}
+$("playerDirSearch").addEventListener("input", (event) => {
+	playerStatsFilter = event.target.value;
+	playerStatsPage = 1;
+	if (playerStatsData) renderPlayerStatsTable();
+});
+$("addPlayerBtn").addEventListener("click", async () => {
+	const name = await showAddPlayerModal();
+	if (name) {
+		await loadCommonPlayers();
+		await loadPlayerStats();
+	}
+});
 
 function autoFillRoster(side) {
 	const max = Math.max(2, Math.min(15, parseInt($(side === "A" ? "playersA" : "playersB").value, 10) || 7));
@@ -2680,6 +3089,11 @@ function renderCrease() {
 let modalResolve = null;
 let modalValidate = null;
 let modalCancelCallback = null;
+let modalHistoryActive = false;
+let isClosingModalFromPopstate = false;
+let isClosingModalFromUI = false;
+let isNavigatingHistory = false;
+let modalReturnFocus = null;
 function modalKey(e) {
 	if (e.key === "Escape" && $("modal").dataset.allowDismiss === "1")
 		closeModal(false);
@@ -2717,8 +3131,18 @@ function renderQrCode(container, url) {
 	container.append(img);
 }
 function closeModal(ok, keepHistory = false) {
-	$("modal").classList.add("hidden");
-	$("modal").setAttribute("aria-hidden", "true");
+	const modal = $("modal");
+	const activeElement = document.activeElement;
+	if (modal.contains(activeElement)) {
+		if (!keepHistory && modalReturnFocus && modalReturnFocus.isConnected) {
+			modalReturnFocus.focus();
+		} else if (activeElement && typeof activeElement.blur === "function") {
+			activeElement.blur();
+		}
+	}
+	if (!keepHistory) modalReturnFocus = null;
+	modal.classList.add("hidden");
+	modal.setAttribute("aria-hidden", "true");
 	document.removeEventListener("keydown", modalKey);
 	const ballsEl = $("modalBalls");
 	if (ballsEl) {
@@ -2799,6 +3223,13 @@ function showModal({
 	modalClass = "",
 	validate = null,
 }) {
+	const modal = $("modal");
+	if (!modalHistoryActive) {
+		const activeElement = document.activeElement;
+		modalReturnFocus = activeElement instanceof HTMLElement && !modal.contains(activeElement)
+			? activeElement
+			: null;
+	}
 	modalValidate = validate || null;
 	modalCancelCallback = onCancel || null;
 	const modalCard = $("modal") ? $("modal").querySelector(".modal-card") : null;
@@ -2917,13 +3348,20 @@ function showModal({
 	}
 	$("modal").dataset.allowDismiss =
 		showCancel || qr || isClose ? "1" : "0";
-	$("modal").classList.remove("hidden");
-	$("modal").setAttribute("aria-hidden", "false");
+	modal.classList.remove("hidden");
+	modal.setAttribute("aria-hidden", "false");
 	document.addEventListener("keydown", modalKey);
 	if (!modalHistoryActive && !isNavigatingHistory) {
 		modalHistoryActive = true;
 		history.pushState({ ...(history.state || {}), isModal: true }, "");
 	}
+	const focusTarget =
+		($("modalCustom") && !$("modalCustom").classList.contains("hidden")
+			? $("modalCustom").querySelector('input:not([type="hidden"]), select, textarea, button:not(.hidden)')
+			: null) || $("modalOk");
+	requestAnimationFrame(() => {
+		if (!modal.classList.contains("hidden")) focusTarget.focus();
+	});
 	return new Promise((res) => {
 		modalResolve = res;
 	});
@@ -4168,13 +4606,28 @@ $("modal").onclick = (e) => {
 		closeModal(false);
 };
 window.addEventListener("popstate", async (event) => {
-	const resolved = window.CricketRouter.resolve();
-	const route =
-		event.state && event.state.cricketScreen
-			? event.state
-			: { cricketScreen: resolved.name, matchId: resolved.matchId };
+	if (isClosingModalFromUI) {
+		isClosingModalFromUI = false;
+		return;
+	}
+	if (modalHistoryActive) {
+		modalHistoryActive = false;
+		isClosingModalFromPopstate = true;
+		closeModal(false, true);
+		isClosingModalFromPopstate = false;
+		if (modalReturnFocus && modalReturnFocus.isConnected) modalReturnFocus.focus();
+		modalReturnFocus = null;
+		return;
+	}
+	isNavigatingHistory = true;
+	try {
+		const resolved = window.CricketRouter.resolve();
+		const route =
+			event.state && event.state.cricketScreen
+				? event.state
+				: { cricketScreen: resolved.name, matchId: resolved.matchId };
 
-	switch (route.cricketScreen) {
+		switch (route.cricketScreen) {
 		case "matches":
 			mainTab = "matches";
 			stopPoll();
@@ -4184,6 +4637,15 @@ window.addEventListener("popstate", async (event) => {
 			show("app");
 			headerMode();
 			loadMatches();
+			break;
+		case "stats":
+			mainTab = "stats";
+			stopPoll();
+			current = null;
+			editingMatch = false;
+			setPendingExtra("");
+			show("app");
+			loadPlayerStats();
 			break;
 		case "login":
 			stopPoll();
@@ -4222,6 +4684,9 @@ window.addEventListener("popstate", async (event) => {
 				showError(error.message);
 			}
 			break;
+		}
+	} finally {
+		isNavigatingHistory = false;
 	}
 });
 boot();
