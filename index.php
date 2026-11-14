@@ -79,16 +79,42 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
     <section id="app" class="hidden">
       <div class="topline">
         <div>
-          <p class="eyebrow">MATCH CENTRE</p>
+          <!-- <p class="eyebrow">MATCH CENTRE</p> -->
           <h1>Scoreboard</h1>
         </div>
         <button id="newMatch" class="primary">＋ New match</button>
         <button id="updateMatch" class="primary hidden">Update match info</button>
       </div>
 
-      <div id="matchesView" class="panel">
-        <h2>Saved matches</h2>
-        <div id="matchList" class="match-list"></div>
+      <div id="matchesView">
+        <div class="home-tabs" role="tablist" aria-label="Home">
+          <button id="savedMatchesTab" class="home-tab" type="button" role="tab" aria-selected="true" aria-controls="savedMatchesPanel" tabindex="0">Saved matches</button>
+          <button id="tossTab" class="home-tab" type="button" role="tab" aria-selected="false" aria-controls="tossPanel" tabindex="-1">Toss</button>
+        </div>
+        <section id="savedMatchesPanel" class="panel home-tabpanel" role="tabpanel" aria-labelledby="savedMatchesTab" tabindex="0">
+          <h2>Saved matches</h2>
+          <div id="matchList" class="match-list"></div>
+        </section>
+        <section id="tossPanel" class="panel home-tabpanel" role="tabpanel" aria-labelledby="tossTab" tabindex="0" hidden>
+          <section class="coin-toss" aria-labelledby="coinTossTitle" aria-busy="false">
+            <div class="coin-toss-copy">
+              <p class="coin-toss-eyebrow">QUICK DECIDER <span>·</span> 50 / 50</p>
+              <h3 id="coinTossTitle">Leave it to chance.</h3>
+              <p class="coin-toss-description">One quick flip to settle heads or tails.</p>
+              <p id="coinTossResult" class="coin-toss-result" role="status" aria-live="polite" aria-atomic="true">Ready when you are.</p>
+            </div>
+            <div class="coin-toss-action">
+              <div class="coin-stage" aria-hidden="true">
+                <span class="coin-stage-caption">HEADS OR TAILS</span>
+                <div class="coin" id="coin" aria-hidden="true">?</div>
+              </div>
+              <button type="button" id="flipCoin" class="primary coin-flip">
+                <span class="coin-flip-icon" aria-hidden="true">↻</span>
+                <span id="flipCoinLabel">Flip coin</span>
+              </button>
+            </div>
+          </section>
+        </section>
       </div>
 
       <div id="setupView" class="panel hidden">

@@ -35,11 +35,37 @@ function show(id) {
 	);
 	$(id).classList.remove("hidden");
 	if (id === "app") {
+		setHomeTab("savedMatchesTab");
 		$("matchesView").classList.remove("hidden");
 		$("setupView").classList.add("hidden");
 		$("scoreView").classList.add("hidden");
 	}
 }
+function setHomeTab(tabId) {
+	const tabs = [$("savedMatchesTab"), $("tossTab")];
+	tabs.forEach((tab) => {
+		const active = tab.id === tabId;
+		tab.setAttribute("aria-selected", String(active));
+		tab.tabIndex = active ? 0 : -1;
+		const panel = $(tab.getAttribute("aria-controls"));
+		panel.hidden = !active;
+		panel.classList.toggle("hidden", !active);
+	});
+}
+[$("savedMatchesTab"), $("tossTab")].forEach((tab, index, tabs) => {
+	tab.addEventListener("click", () => setHomeTab(tab.id));
+	tab.addEventListener("keydown", (event) => {
+		let nextIndex;
+		if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+		else if (event.key === "ArrowLeft") nextIndex = (index + tabs.length - 1) % tabs.length;
+		else if (event.key === "Home") nextIndex = 0;
+		else if (event.key === "End") nextIndex = tabs.length - 1;
+		else return;
+		event.preventDefault();
+		tabs[nextIndex].focus();
+		setHomeTab(tabs[nextIndex].id);
+	});
+});
 function readScoreId() {
 	const m = String(location.hash || "").match(/^#m=(\d+)$/);
 	return m ? m[1] : null;
@@ -170,6 +196,82 @@ $("loginBtn").onclick = () => {
 	setRoute("login", current);
 	show("login");
 };
+async function tossCoin() {
+	const button = $("flipCoin");
+	const section = button.closest(".coin-toss");
+	const coin = $("coin");
+	const resultMessage = $("coinTossResult");
+	const buttonLabel = $("flipCoinLabel");
+	const heads = Math.random() < 0.5;
+	const result = heads ? "Heads" : "Tails";
+	const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+	button.disabled = true;
+	buttonLabel.textContent = "Flipping…";
+	section.setAttribute("aria-busy", "true");
+	resultMessage.textContent = "Flipping coin…";
+
+	if (!reducedMotion && coin.animate) {
+		const rect = coin.getBoundingClientRect();
+		const viewportWidth = window.innerWidth;
+		const viewportHeight = window.innerHeight;
+		const coinSize = Math.min(
+			rect.width,
+			rect.height,
+			Math.max(0, Math.min(viewportWidth, viewportHeight) - 24) / 1.12,
+		);
+		const startVisibility = coin.style.visibility;
+		const flyingCoin = coin.cloneNode(true);
+		flyingCoin.removeAttribute("id");
+		flyingCoin.classList.remove("is-settled");
+		flyingCoin.textContent = "?";
+		flyingCoin.setAttribute("aria-hidden", "true");
+		Object.assign(flyingCoin.style, {
+			position: "fixed",
+			left: (viewportWidth - coinSize) / 2 + "px",
+			top: (viewportHeight - coinSize) / 2 + "px",
+			width: coinSize + "px",
+			height: coinSize + "px",
+			margin: "0",
+			zIndex: "2147483647",
+			pointerEvents: "none",
+		});
+		document.body.appendChild(flyingCoin);
+		coin.style.visibility = "hidden";
+
+		const travel = Math.min(
+			viewportHeight * 0.2,
+			Math.max(0, (viewportHeight - coinSize * 1.12) / 2 - 12),
+		);
+		const lift = -travel;
+		try {
+			const animation = flyingCoin.animate(
+				[
+					{ transform: "perspective(700px) translate3d(0, 0, 0) rotateX(0) rotateY(0) scale(1)", offset: 0 },
+					{ transform: `perspective(700px) translate3d(0, ${lift}px, 0) rotateX(540deg) rotateY(720deg) scale(1.12)`, offset: 0.44 },
+					{ transform: `perspective(700px) translate3d(0, ${lift * 0.82}px, 0) rotateX(1260deg) rotateY(1620deg) scale(.96)`, offset: 0.76 },
+					{ transform: "perspective(700px) translate3d(0, 0, 0) rotateX(1800deg) rotateY(2160deg) scale(1)", offset: 1 },
+				],
+				{ duration: 1450, easing: "ease-in-out" },
+			);
+			await animation.finished;
+		} catch (e) {
+		} finally {
+			flyingCoin.remove();
+			coin.style.visibility = startVisibility;
+		}
+	}
+
+	coin.textContent = heads ? "H" : "T";
+	coin.classList.remove("is-settled");
+	void coin.offsetWidth;
+	coin.classList.add("is-settled");
+	section.classList.add("has-result");
+	resultMessage.textContent = result + " (" + (heads ? "H" : "T") + ").";
+	buttonLabel.textContent = "Flip again";
+	button.disabled = false;
+	section.setAttribute("aria-busy", "false");
+}
+$("flipCoin").onclick = tossCoin;
 $("togglePassword").onclick = () => {
 	const input = $("password");
 	const show = input.type === "password";
