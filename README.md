@@ -17,6 +17,7 @@ This version is designed for Hostinger Premium Web Hosting. It uses PHP (PDO) an
 ## 3. Create the table
 1. In hPanel open **phpMyAdmin** for the database.
 2. Select the database, open the **Import** tab, and import `schema.sql`.
+3. If this is an existing installation, take a database backup before deploying. The first data API request after deployment migrates legacy `matches.state_json` records into match, roster, innings, and delivery rows, then removes the legacy JSON column. Keep the backup until you have verified saved matches and scorecards.
 
 ## 4. Open the app
 Visit `https://your-domain.com/` (or the subdirectory where you uploaded it). Sign in with the admin password configured in `config.php`.
@@ -30,6 +31,7 @@ Visit `https://your-domain.com/` (or the subdirectory where you uploaded it). Si
 - Live innings total, wickets, overs, run rate, extras and legal-ball count.
 - Basic batting and bowling tables, recent deliveries, live delivery editing and undo-last-delivery.
 - Saved matches stored in MySQL.
+- Match metadata, team rosters, innings, and deliveries stored in indexed relational tables; JSON is used only for the API request/response format.
 
 ## Important limitations
 This is a starter scoring application, not a fully validated official scoring engine. It currently supports one innings per match and one admin login. Strike rotation, end changes, full bowling legality, run-outs involving non-strikers, retired hurt/retired out rules, partnerships, fall of wickets, second innings/target calculation, and match result are not fully implemented. Deliveries can be edited only while a match is live and unlocked. Validate the scoring logic before using it for an official match. Use HTTPS and a strong admin password. For multiple scorers or public live score viewing, add role-based authentication and a proper event/audit model.

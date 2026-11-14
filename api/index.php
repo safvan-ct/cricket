@@ -143,18 +143,6 @@ function ensurePlayersTable(PDO $pdo): void
   } catch (PDOException $e) {}
 }
 
-function registerRosterPlayers(PDO $pdo, array $names): void
-{
-  ensurePlayersTable($pdo);
-  $ins = $pdo->prepare("INSERT IGNORE INTO players (name) VALUES (?)");
-  foreach ($names as $name) {
-    $n = trim((string)$name);
-    if ($n !== '') {
-      $ins->execute([$n]);
-    }
-  }
-}
-
 function normalizePlayerName(mixed $val): string
 {
   $v = trim((string)$val);
@@ -169,6 +157,14 @@ function normalizePlayerName(mixed $val): string
   return preg_replace_callback('/(^|[\s\-\.\/\'])([a-z])/u', function ($m) {
     return $m[1] . strtoupper($m[2]);
   }, $lower);
+}
+
+require_once __DIR__ . '/storage.php';
+try {
+  ensureNormalizedStorage($pdo);
+} catch (Throwable $e) {
+  error_log('Cricket database schema migration failed: ' . $e->getMessage());
+  respond(['error' => 'Database schema migration failed. Existing match data was retained; check the server error log.'], 500);
 }
 
 function initPlayerStatsRow(mixed $name, int $id = 0, int $isActive = 1): array
@@ -218,7 +214,9 @@ function initPlayerStatsRow(mixed $name, int $id = 0, int $isActive = 1): array
 function computeAllPlayerStats(PDO $pdo, ?string $targetPlayer = null): array
 {
   ensurePlayersTable($pdo);
-  $matches = $pdo->query("SELECT id, title, state_json, created_at, updated_at FROM matches ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC);
+  $matches = $pdo->query(
+    "SELECT id, created_at FROM matches WHERE status = 'complete' ORDER BY id ASC"
+  )->fetchAll(PDO::FETCH_ASSOC);
   $playersQuery = $pdo->query("SELECT id, name, is_active FROM players ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
   $stats = [];
@@ -228,14 +226,15 @@ function computeAllPlayerStats(PDO $pdo, ?string $targetPlayer = null): array
   }
 
   foreach ($matches as $m) {
-    $s = json_decode($m['state_json'], true) ?: [];
+    $s = loadNormalizedMatchState($pdo, (int)$m['id']);
+    if (!$s) continue;
     // User requirement: completed matches only!
     if (($s['status'] ?? '') !== 'complete') {
       continue;
     }
 
     $mId = (int)$m['id'];
-    $mTitle = (string)$m['title'];
+    $mTitle = (string)$s['team_a'] . ' vs ' . (string)$s['team_b'];
     $mDate = (string)($m['created_at'] ?? '');
 
     $rosterA = $s['roster_a'] ?? [];
@@ -495,12 +494,19 @@ function getLeaderboards(array $stats): array
 
 function allMatches(PDO $pdo): array
 {
-  $rows = $pdo->query('SELECT id,title,state_json,created_at,updated_at FROM matches ORDER BY id DESC')->fetchAll();
+  $rows = $pdo->query('SELECT id, created_at, updated_at FROM matches ORDER BY id DESC')->fetchAll(PDO::FETCH_ASSOC);
   foreach ($rows as &$r) {
-    $s = json_decode($r['state_json'], true) ?: [];
-    ensureRosters($s);
-    $r = ['id' => (int)$r['id'], 'title' => $r['title'], 'state' => $s, 'created_at' => $r['created_at'], 'updated_at' => $r['updated_at']];
+    $s = loadNormalizedMatchState($pdo, (int)$r['id']);
+    if (!$s) throw new RuntimeException('Match disappeared while building match list');
+    $r = [
+      'id' => (int)$r['id'],
+      'title' => $s['team_a'] . ' vs ' . $s['team_b'],
+      'state' => $s,
+      'created_at' => $r['created_at'],
+      'updated_at' => $r['updated_at'],
+    ];
   }
+  unset($r);
   return $rows;
 }
 if ($action === 'list') respond(['matches' => allMatches($pdo)]);
@@ -638,10 +644,16 @@ if ($action === 'create') {
     'openers_innings' => null,
     'created' => date('c')
   ];
-  $st = $pdo->prepare('INSERT INTO matches(title,state_json) VALUES(?,?)');
-  $st->execute([$a . ' vs ' . $c, json_encode($state)]);
+  $pdo->beginTransaction();
+  $st = $pdo->prepare(
+    'INSERT INTO matches
+     (team_a, team_b, players_a, players_b, overs_limit, batting_first, current_innings, status)
+     VALUES (?, ?, ?, ?, ?, ?, 1, ?)'
+  );
+  $st->execute([$a, $c, $playersA, $playersB, $overs, $bat, 'live']);
   $newMatchId = (int)$pdo->lastInsertId();
-  registerRosterPlayers($pdo, array_merge($rosterA, $rosterB));
+  persistNormalizedMatch($pdo, $newMatchId, $state);
+  $pdo->commit();
   respond(['id' => $newMatchId, 'state' => $state], 201);
 }
 function teamName(array $s, string $side): string
@@ -760,30 +772,30 @@ function applyAutoClose(array &$s): void
 }
 function loadMatchForUpdate(PDO $pdo, int $id): array
 {
-  $st = $pdo->prepare('SELECT state_json FROM matches WHERE id=? FOR UPDATE');
+  $st = $pdo->prepare('SELECT id FROM matches WHERE id=? FOR UPDATE');
   $st->execute([$id]);
   $r = $st->fetch();
   if (!$r) {
     $pdo->rollBack();
     respond(['error' => 'Match not found'], 404);
   }
-  return json_decode($r['state_json'], true) ?: [];
+  $state = loadNormalizedMatchState($pdo, $id, true);
+  if (!$state) {
+    $pdo->rollBack();
+    respond(['error' => 'Match not found'], 404);
+  }
+  return $state;
 }
 function saveMatch(PDO $pdo, int $id, array $s): void
 {
-  $st = $pdo->prepare('UPDATE matches SET state_json=? WHERE id=?');
-  $st->execute([json_encode($s), $id]);
+  persistNormalizedMatch($pdo, $id, $s);
 }
 
 $id = (int)($_GET['id'] ?? 0);
 if ($action === 'get') {
-  $st = $pdo->prepare('SELECT id,title,state_json FROM matches WHERE id=?');
-  $st->execute([$id]);
-  $r = $st->fetch();
-  if (!$r) respond(['error' => 'Match not found'], 404);
-  $s = json_decode($r['state_json'], true) ?: [];
-  ensureRosters($s);
-  respond(['id' => (int)$r['id'], 'title' => $r['title'], 'state' => $s]);
+  $s = loadNormalizedMatchState($pdo, $id);
+  if (!$s) respond(['error' => 'Match not found'], 404);
+  respond(['id' => $id, 'title' => $s['team_a'] . ' vs ' . $s['team_b'], 'state' => $s]);
 }
 if ($action === 'update') {
   requireAdmin();
@@ -849,12 +861,9 @@ if ($action === 'update') {
   }
   $title = $a . ' vs ' . $c;
   saveMatch($pdo, $id, $s);
-  $st = $pdo->prepare('UPDATE matches SET title=? WHERE id=?');
-  $st->execute([$title, $id]);
   if ($pdo->inTransaction()) {
     $pdo->commit();
   }
-  registerRosterPlayers($pdo, array_merge($s['roster_a'], $s['roster_b']));
   respond(['ok' => true, 'title' => $title, 'state' => $s]);
 }
 if ($action === 'set_crease') {

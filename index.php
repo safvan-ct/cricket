@@ -13,6 +13,7 @@ $appVersion = substr(hash('sha256', implode('|', [
   hash_file('sha256', __DIR__ . '/assets/icon-512.png'),
   hash_file('sha256', __DIR__ . '/manifest.webmanifest'),
   hash_file('sha256', __DIR__ . '/api/index.php'),
+  hash_file('sha256', __DIR__ . '/api/storage.php'),
 ])), 0, 16);
 header('Cache-Control: no-cache, no-store, must-revalidate');
 ?>

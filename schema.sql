@@ -1,16 +1,114 @@
-CREATE TABLE IF NOT EXISTS matches (
-  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  title VARCHAR(150) NOT NULL,
-  state_json LONGTEXT NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 CREATE TABLE IF NOT EXISTS players (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(100) NOT NULL UNIQUE,
   role VARCHAR(50) DEFAULT 'All-Rounder',
   is_active TINYINT(1) NOT NULL DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_players_active_name (is_active, name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS matches (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  team_a VARCHAR(150) NOT NULL,
+  team_b VARCHAR(150) NOT NULL,
+  players_a TINYINT UNSIGNED NOT NULL DEFAULT 7,
+  players_b TINYINT UNSIGNED NOT NULL DEFAULT 7,
+  overs_limit TINYINT UNSIGNED NOT NULL DEFAULT 6,
+  batting_first CHAR(1) NOT NULL DEFAULT 'A',
+  current_innings TINYINT UNSIGNED NOT NULL DEFAULT 1,
+  status VARCHAR(16) NOT NULL DEFAULT 'live',
+  locked TINYINT(1) NOT NULL DEFAULT 0,
+  target SMALLINT UNSIGNED DEFAULT NULL,
+  result_winner_side CHAR(1) DEFAULT NULL,
+  result_text VARCHAR(255) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_matches_status_created (status, created_at, id),
+  KEY idx_matches_created (created_at, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS match_roster (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  match_id BIGINT UNSIGNED NOT NULL,
+  side CHAR(1) NOT NULL,
+  player_id BIGINT UNSIGNED DEFAULT NULL,
+  display_name VARCHAR(100) NOT NULL,
+  batting_order TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  KEY idx_roster_match_side_order (match_id, side, is_active, batting_order),
+  KEY idx_roster_player_match (player_id, match_id),
+  KEY idx_roster_match_name (match_id, side, display_name),
+  CONSTRAINT fk_roster_match FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE,
+  CONSTRAINT fk_roster_player FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS innings (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  match_id BIGINT UNSIGNED NOT NULL,
+  innings_number TINYINT UNSIGNED NOT NULL,
+  batting_side CHAR(1) NOT NULL,
+  is_closed TINYINT(1) NOT NULL DEFAULT 0,
+  total_runs SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  wickets TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  legal_balls SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  target SMALLINT UNSIGNED DEFAULT NULL,
+  striker_id BIGINT UNSIGNED DEFAULT NULL,
+  non_striker_id BIGINT UNSIGNED DEFAULT NULL,
+  bowler_id BIGINT UNSIGNED DEFAULT NULL,
+  opener_striker_id BIGINT UNSIGNED DEFAULT NULL,
+  opener_non_striker_id BIGINT UNSIGNED DEFAULT NULL,
+  opener_bowler_id BIGINT UNSIGNED DEFAULT NULL,
+  UNIQUE KEY uq_innings_match_number (match_id, innings_number),
+  KEY idx_innings_match_side (match_id, batting_side),
+  KEY idx_innings_target (target),
+  CONSTRAINT fk_innings_match FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE,
+  CONSTRAINT fk_innings_striker FOREIGN KEY (striker_id) REFERENCES match_roster(id) ON DELETE SET NULL,
+  CONSTRAINT fk_innings_non_striker FOREIGN KEY (non_striker_id) REFERENCES match_roster(id) ON DELETE SET NULL,
+  CONSTRAINT fk_innings_bowler FOREIGN KEY (bowler_id) REFERENCES match_roster(id) ON DELETE SET NULL,
+  CONSTRAINT fk_innings_opener_striker FOREIGN KEY (opener_striker_id) REFERENCES match_roster(id) ON DELETE SET NULL,
+  CONSTRAINT fk_innings_opener_non_striker FOREIGN KEY (opener_non_striker_id) REFERENCES match_roster(id) ON DELETE SET NULL,
+  CONSTRAINT fk_innings_opener_bowler FOREIGN KEY (opener_bowler_id) REFERENCES match_roster(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS deliveries (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  innings_id BIGINT UNSIGNED NOT NULL,
+  sequence_number SMALLINT UNSIGNED NOT NULL,
+  runs TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  extra_type VARCHAR(20) NOT NULL DEFAULT '',
+  extra_runs TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  is_wicket TINYINT(1) NOT NULL DEFAULT 0,
+  dismissal VARCHAR(40) DEFAULT NULL,
+  batter_id BIGINT UNSIGNED DEFAULT NULL,
+  striker_id BIGINT UNSIGNED DEFAULT NULL,
+  non_striker_id BIGINT UNSIGNED DEFAULT NULL,
+  bowler_id BIGINT UNSIGNED DEFAULT NULL,
+  dismissed_player_id BIGINT UNSIGNED DEFAULT NULL,
+  next_batter_id BIGINT UNSIGNED DEFAULT NULL,
+  strike_rotated TINYINT(1) DEFAULT NULL,
+  crease_before_striker_id BIGINT UNSIGNED DEFAULT NULL,
+  crease_before_non_striker_id BIGINT UNSIGNED DEFAULT NULL,
+  crease_before_bowler_id BIGINT UNSIGNED DEFAULT NULL,
+  crease_after_striker_id BIGINT UNSIGNED DEFAULT NULL,
+  crease_after_non_striker_id BIGINT UNSIGNED DEFAULT NULL,
+  crease_after_bowler_id BIGINT UNSIGNED DEFAULT NULL,
+  created_at DATETIME NOT NULL,
+  UNIQUE KEY uq_delivery_innings_sequence (innings_id, sequence_number),
+  KEY idx_delivery_batter_innings (batter_id, innings_id),
+  KEY idx_delivery_bowler_innings (bowler_id, innings_id),
+  KEY idx_delivery_dismissed_innings (dismissed_player_id, innings_id),
+  CONSTRAINT fk_delivery_innings FOREIGN KEY (innings_id) REFERENCES innings(id) ON DELETE CASCADE,
+  CONSTRAINT fk_delivery_batter FOREIGN KEY (batter_id) REFERENCES match_roster(id) ON DELETE SET NULL,
+  CONSTRAINT fk_delivery_striker FOREIGN KEY (striker_id) REFERENCES match_roster(id) ON DELETE SET NULL,
+  CONSTRAINT fk_delivery_non_striker FOREIGN KEY (non_striker_id) REFERENCES match_roster(id) ON DELETE SET NULL,
+  CONSTRAINT fk_delivery_bowler FOREIGN KEY (bowler_id) REFERENCES match_roster(id) ON DELETE SET NULL,
+  CONSTRAINT fk_delivery_dismissed FOREIGN KEY (dismissed_player_id) REFERENCES match_roster(id) ON DELETE SET NULL,
+  CONSTRAINT fk_delivery_next_batter FOREIGN KEY (next_batter_id) REFERENCES match_roster(id) ON DELETE SET NULL,
+  CONSTRAINT fk_delivery_before_striker FOREIGN KEY (crease_before_striker_id) REFERENCES match_roster(id) ON DELETE SET NULL,
+  CONSTRAINT fk_delivery_before_non_striker FOREIGN KEY (crease_before_non_striker_id) REFERENCES match_roster(id) ON DELETE SET NULL,
+  CONSTRAINT fk_delivery_before_bowler FOREIGN KEY (crease_before_bowler_id) REFERENCES match_roster(id) ON DELETE SET NULL,
+  CONSTRAINT fk_delivery_after_striker FOREIGN KEY (crease_after_striker_id) REFERENCES match_roster(id) ON DELETE SET NULL,
+  CONSTRAINT fk_delivery_after_non_striker FOREIGN KEY (crease_after_non_striker_id) REFERENCES match_roster(id) ON DELETE SET NULL,
+  CONSTRAINT fk_delivery_after_bowler FOREIGN KEY (crease_after_bowler_id) REFERENCES match_roster(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
